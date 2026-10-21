@@ -57,6 +57,14 @@
   .plate .cap span { color:var(--muted); }
   code { font:.9em var(--mono); }
 
+  .components { margin:72px 0 0; }
+  .components h3 { font:600 15px/1.3 var(--sans); margin:28px 0 12px; }
+  .components .lede { color:var(--muted); max-width:62ch; margin:-6px 0 0; }
+  .parts { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:12px; }
+  .parts li { background:var(--plate); border:1px solid var(--rule); border-radius:6px; padding:14px 12px 10px; display:flex; flex-direction:column; align-items:center; gap:10px; }
+  .parts .pic { height:120px; width:100%; display:flex; align-items:center; justify-content:center; }
+  .parts svg { max-width:100%; max-height:120px; width:auto; height:auto; }
+  .parts code { font:12px/1.4 var(--mono); color:var(--muted); text-align:center; word-break:break-word; }
   .textures { margin:72px 0 0; }
   .textures .lede { color:var(--muted); max-width:62ch; margin:-6px 0 18px; }
   .swatches { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; }
@@ -92,7 +100,7 @@
 <div class="wrap">
   <div class="bar">
     <b>machine-mermaid</b>
-    <nav><a href="#figures">Figures</a><a href="https://github.com/frinfo702/machine-mermaid">GitHub</a><button id="theme" type="button">Dark mode</button></nav>
+    <nav><a href="#figures">Figures</a><a href="#comp-h">Components</a><a href="https://github.com/frinfo702/machine-mermaid">GitHub</a><button id="theme" type="button">Dark mode</button></nav>
   </div>
 
   <section class="hero">
@@ -128,6 +136,12 @@ return fig</textarea>
       <div class="filters" id="filters" role="group" aria-label="Filter figures"></div>
     </div>
     <ul class="plates" id="plates"></ul>
+  </section>
+
+  <section class="components" aria-labelledby="comp-h">
+    <div class="head"><h2 id="comp-h">Components</h2></div>
+    <p class="lede">Every block you can call, with the line that makes it. Layers take <code>(label?, options?)</code>; the presets come with a label and color you can override.</p>
+    <div id="components"></div>
   </section>
 
   <section class="textures" aria-labelledby="tex-h">
@@ -354,6 +368,12 @@ fig.mount('#figure')</pre>
   const svgOf = code => build(code).svg({ theme: theme() })
   const root = document.documentElement
   const FIGS = JSON.parse($('figs').textContent)
+  const COMPONENTS = {"Basic": ["block('Block')", "thin('Thin')", "text('$\\\\mathbf{x}_t$')", "circle('$\\\\mathbf{z}$')", "op('+')", "op('*')", "op('~')", "enc('Encoder')", "dec('Decoder')", "tensor('$\\\\mathbf{X}$', { size: [36, 64, 20] })", "stack('Feature maps', { n: 4 })", "neurons('Layer', { n: 4 })", "vector(['0.22', '0.63', '0.15'])"], "ML presets": ["mha()", "attention()", "ffn()", "mlp()", "norm()", "embed()", "linear()", "softmax()", "matmul()", "concat()", "conv()", "pool()", "act()", "dropout()", "loss()"], "3D": ["gaussian('$p(\\\\mathbf{z})$')", "gaussian('mixture', { peaks: [[-0.45, -0.2, 1, 0.3], [0.5, 0.35, 0.7, 0.28]] })", "space('latent', { points: samplePoints })", "sphere('$\\\\mathbb{S}^2$', { points: samplePoints })"], "Images": ["image(demoImage(), 'image')", "image(demoImage(), 'patches', { grid: 4 })", "image(demoImage(), 'batch', { n: 3 })", "image(demoImage(0.6), 'noisy')"]}
+  // a few labelled 3D points for the space / sphere samples
+  const samplePoints = Array.from({ length: 30 }, (_, i) => {
+    const c = i % 3, a = c * 2.1 + Math.sin(i * 7.1) * 0.3, b = 0.35 + Math.cos(i * 3.7) * 0.3
+    return [Math.cos(a) * Math.cos(b) * 0.8, Math.sin(a) * Math.cos(b) * 0.8, Math.sin(b) * (c - 1) * 0.8, c]
+  })
   const TEXTURES = [['ice', 'frozen weights'], ['magma', 'trainable weights'], ['glass', 'soft prompts, adapters'], ['metal', 'fixed ops, hardware'],
     ['noise', 'noise injection, diffusion'], ['quantized', 'low-bit weights'], ['sparse', 'pruned weights'], ['hatch', 'masked, stop-gradient'],
     ['crossed', 'removed, ablated']]
@@ -408,6 +428,11 @@ fig.mount('#figure')</pre>
     for (const b of $('plates').querySelectorAll('button.fig')) {
       try { b.innerHTML = svgOf(FIGS[+b.dataset.i].src) } catch (e) { b.textContent = e.message }
     }
+    $('components').innerHTML = Object.entries(COMPONENTS).map(([group, items]) => `<h3>${group}</h3><ul class="parts">${items.map(code => {
+      const f = new mm.Figure({ theme: theme() })
+      f.input(new Function(...Object.keys(scope), 'samplePoints', `return ${code}`)(...Object.values(scope), samplePoints))
+      return `<li><div class="pic">${f.svg()}</div><code>${code.replace(/</g, '&lt;')}</code></li>`
+    }).join('')}</ul>`).join('')
     $('swatches').innerHTML = TEXTURES.map(([t, use]) => {
       const f = new mm.Figure({ theme: theme() })
       f.input(mm.block(t, t === 'crossed' ? { crossed: true, w: 150, h: 60 } : { texture: t, w: 150, h: 60 }))
