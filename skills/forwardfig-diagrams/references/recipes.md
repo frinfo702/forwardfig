@@ -1,10 +1,10 @@
 # Recipes: paper figures and the technique each one shows
 
-These come from the demo gallery (`demo/index.html`, the `figs` JSON block, 23
-figures in all — read it for CNNs, VAE, GAN, CLIP, QLoRA, PointNet, wav2vec,
-AlexNet, causal attention). Gallery snippets end in `return fig`; in a file for
-the CLI, use `export default fig`. `demoImage()` is a gallery helper; pass an
-image URL, data URL, `<img>` or `<canvas>` instead.
+These come from the demo gallery (https://frinfo702.github.io/forwardfig/demo/,
+23 figures in all, including CNNs, VAE, GAN, CLIP, QLoRA, PointNet, wav2vec,
+AlexNet and causal attention). Each snippet assumes the needed names are
+imported from `'forwardfig'` and ends with the figure built; in a file for the
+CLI, add `export default fig`. `src` stands for an image URL or data URL.
 
 Contents: Transformer · Mixture of Experts · ViT · U-Net · DDPM · LoRA · LLaVA
 

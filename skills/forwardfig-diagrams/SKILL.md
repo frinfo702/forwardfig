@@ -1,6 +1,6 @@
 ---
 name: forwardfig-diagrams
-description: How to draw clean, readable ML architecture figures with forwardfig (TypeScript, SVG out) and get the layout you intended — structure the code like the model, steer the automatic layout with lanes/ranks instead of coordinates, and verify by rendering to PNG and looking. Use this whenever you write or edit code that imports `forwardfig`, when asked to draw a model / network / architecture / paper figure (Transformer, ViT, U-Net, LoRA, VAE, diffusion, MoE, ...) in this repo, or when a forwardfig figure looks cluttered, has crossing or detouring arrows, misplaced blocks, or overlapping labels.
+description: How to draw clean, readable ML architecture figures with forwardfig (TypeScript, SVG out) and get the layout you intended — structure the code like the model, steer the automatic layout with lanes/ranks instead of coordinates, and verify by rendering to PNG and looking. Use this whenever you write or edit code that imports `forwardfig`, when asked to draw a model / network / architecture / paper figure (Transformer, ViT, U-Net, LoRA, VAE, diffusion, MoE, ...) in a project that uses forwardfig, or when a forwardfig figure looks cluttered, has crossing or detouring arrows, misplaced blocks, or overlapping labels.
 ---
 
 # Drawing architecture figures with forwardfig
@@ -17,10 +17,17 @@ figures come from three habits:
 3. **Render and look.** You cannot judge a layout from code. Render a PNG,
    view it, fix one thing, repeat.
 
-Full API: `doc/` in this repo (`concepts.md`, `blocks.md`, `layout.md`,
-`styling.md`, `images-and-data.md`, `api.md`). Worked paper figures:
-`references/recipes.md` (read it when drawing a known architecture or when a
-pattern below isn't enough).
+**Before writing any figure code, read `references/api.md`.** forwardfig is
+young and almost certainly not in your training data, so guessing names from
+similar libraries (graphviz, matplotlib, torchview) produces code that doesn't
+compile. The reference lists every factory, option and edge style.
+`references/recipes.md` has seven paper figures (Transformer, MoE, ViT, U-Net,
+DDPM, LoRA, LLaVA), each annotated with the layout technique it shows; skim
+it when your figure has parallel branches, side inputs or a known shape.
+
+If the API reference doesn't answer a question, the installed package has
+typings at `node_modules/forwardfig/dist/api.d.ts` and the online docs are at
+https://frinfo702.github.io/forwardfig/docs/.
 
 ## The render–look–fix loop
 
@@ -37,12 +44,13 @@ export default fig
 ```
 
 ```sh
-npx forwardfig fig.ts -o fig.png    # needs sharp (npm i -D sharp); .svg needs nothing
+npm i forwardfig && npm i -D sharp  # sharp is only for PNG output
+npx forwardfig fig.ts -o fig.png    # .ts needs Node ≥ 22.6 or Bun; .mjs works everywhere
 ```
 
-Inside this repo, build once (`bun install && bun run build`) and run
-`bun dist/cli.js fig.ts -o fig.png`, importing from `src/index` instead of
-`'forwardfig'`. Then open the PNG with your image-reading tool and check:
+(Inside the forwardfig repo itself: `bun install && bun run build`, import from
+`src/index`, run `bun dist/cli.js fig.ts -o fig.png`.) Then open the PNG with
+your image-reading tool and check:
 
 - Does the main path run in one straight line?
 - Do any arrows cross, or take a long detour around blocks?
@@ -67,6 +75,11 @@ of its first input**. So the order and identity of calls is the layout.
 - **Write residuals naturally and let the engine route them.** `norm()(this.attn(x), x)`
   is all a residual needs: the straight input stays put and the skip is drawn
   as a detour. Don't add `skip`, `side` or lanes until a render shows a problem.
+- **`norm()` is post-LN "Add & Norm"**: `norm()(sublayer(x), x)` draws one
+  block that adds and normalizes. For pre-LN (GPT-2, LLaMA) draw the norm
+  before the sublayer and the residual as a separate ⊕:
+  `add(this.attn(this.ln1(x)), x)`, where `ln1 = layerNorm()` and
+  `const layerNorm = preset('thin', 'LayerNorm', 'yellow')`.
 - **When branches merge, the first argument's lane tends to win** (a block
   takes the lane of its first unclaimed input). If a merge block lands in the
   wrong column, reorder its arguments before adding `lane`.
