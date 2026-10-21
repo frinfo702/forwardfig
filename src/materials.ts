@@ -1,10 +1,11 @@
-// Realistic ice / magma fills, ported from frinfo702/portfolio (materials.ts).
+// Realistic texture fills. Ice and magma are ported from frinfo702/portfolio
+// (materials.ts); glass, metal and noise follow the same block outline.
 // The WebGL shaders run once per block size; the result is baked to an image
 // and embedded in the SVG, so the diagram itself stays a static string.
 // No WebGL (SSR, Node, old browsers) → bake() returns null and the caller
 // falls back to the vector look.
 
-export type Material = 'ice' | 'heat'
+export type Material = 'ice' | 'heat' | 'glass' | 'metal' | 'noise'
 
 const SIZE = 1024
 
@@ -214,6 +215,54 @@ void main() {
   gl_FragColor = vec4(min(col, 1.0), 1.0);
 }`
 
+// Brushed metal: streaks along x, a soft specular band, a bevelled rim.
+const METAL = `${COMMON}
+void main() {
+  vec2 px = vUv * uRes;
+  float d = inside(px);
+  if (d < 0.0) { gl_FragColor = vec4(0.0); return; }
+  float streak = fbm(vec2(px.x / 140.0, px.y * 0.7) + uSeed);
+  float fine = noise(vec2(px.x / 5.0, px.y * 3.0) + uSeed);
+  vec3 col = mix(vec3(0.50, 0.53, 0.57), vec3(0.80, 0.82, 0.85), vUv.y);
+  col += (streak - 0.5) * 0.22 + (fine - 0.5) * 0.07;
+  col += exp(-pow((vUv.x * 0.8 + (1.0 - vUv.y) * 0.5 - 0.55) / 0.16, 2.0)) * 0.22;
+  float bevel = 1.0 - smoothstep(0.0, BEVEL * 0.7, d);
+  col = mix(col, mix(vec3(0.32, 0.34, 0.37), vec3(0.96), vUv.y), bevel * 0.55);
+  col += exp(-pow((d - 1.2) / 0.8, 2.0)) * 0.25;
+  gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+}`
+
+// Frosted glass: translucent, so the block's own color shows through, with a
+// blurred grain, a lit rim and two specular streaks.
+const GLASS = `${COMMON}
+void main() {
+  vec2 px = vUv * uRes;
+  float d = inside(px);
+  if (d < 0.0) { gl_FragColor = vec4(0.0); return; }
+  float frost = fbm(px / 9.0 + uSeed) * 0.6 + fbm(px / 40.0 + uSeed * 2.0) * 0.4;
+  float rim = 1.0 - smoothstep(0.0, BEVEL * 1.2, d);
+  float edge = exp(-pow((d - 1.3) / 0.9, 2.0));
+  float s1 = exp(-pow((vUv.x * 0.7 + vUv.y - 1.15) / 0.05, 2.0));
+  float s2 = exp(-pow((vUv.x * 0.7 + vUv.y - 1.32) / 0.02, 2.0));
+  float a = 0.2 + frost * 0.18 + rim * 0.35 * vUv.y + edge * 0.6 + s1 * 0.3 + s2 * 0.45;
+  vec3 col = vec3(1.0) - (1.0 - vUv.y) * rim * 0.3;
+  gl_FragColor = vec4(col, clamp(a, 0.0, 0.9));
+}`
+
+// Gaussian grain per device pixel, like a sample late in the forward diffusion.
+const NOISE = `${COMMON}
+void main() {
+  vec2 px = vUv * uRes;
+  float d = inside(px);
+  if (d < 0.0) { gl_FragColor = vec4(0.0); return; }
+  vec2 c = floor(gl_FragCoord.xy);
+  vec2 h = hash2(c);
+  float g = sqrt(-2.0 * log(h.x + 1e-4)) * cos(6.2832 * h.y);
+  vec3 tint = vec3(hash2(c + 17.0).x, hash2(c + 41.0).x, hash2(c + 73.0).x) - 0.5;
+  vec3 col = clamp(0.5 + g * 0.18 + tint * 0.25, 0.0, 1.0);
+  gl_FragColor = vec4(col, 0.55 + exp(-pow((d - 1.2) / 0.9, 2.0)) * 0.3);
+}`
+
 let gl: WebGLRenderingContext | null | undefined
 let canvas: HTMLCanvasElement
 const programs = {} as Record<Material, WebGLProgram>
@@ -252,6 +301,9 @@ function setup() {
     g.vertexAttribPointer(0, 2, g.FLOAT, false, 0, 0)
     programs.ice = link(g, ICE)
     programs.heat = link(g, HEAT)
+    programs.glass = link(g, GLASS)
+    programs.metal = link(g, METAL)
+    programs.noise = link(g, NOISE)
     gl = g
   } catch { gl = null }
   return gl

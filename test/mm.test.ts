@@ -114,3 +114,19 @@ test('tex: scripts and fonts', () => {
   expect(runs.some(r => r.t === 't' && r.it && r.dy > 0)).toBe(true)
   expect(runs.some(r => r.t === '2' && r.dy < 0)).toBe(true)
 })
+
+test('textures and the neutral default color', () => {
+  const svg = figure({}, fig => {
+    const x = fig.input('x')
+    block('q', { texture: 'quantized', color: 'blue' })(x)
+    block('s', { texture: 'sparse' })(x)
+    block('h', { texture: 'hatch' })(x)
+    block('n', { texture: 'noise' })(x)
+    block('g', { texture: 'glass', color: 'teal' })(x)
+    block('m', { texture: 'metal' })(x)
+    block('plain')(x)
+  }).svg()
+  for (const k of ['p-quantized-blue', 'p-sparse-none', 'p-hatch-none', 'p-grain-none', 'metal', 'c-none']) expect(svg).toContain(k)
+  expect(svg).toContain('#e2e5e9')
+  expect(svg).not.toContain('NaN')
+})

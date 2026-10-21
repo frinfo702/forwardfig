@@ -1,17 +1,19 @@
 import type { Diagram, Edge, Group, Node } from './types'
 import { FS, OUTSIDE, nums, values } from './layout'
-import { bake } from './materials'
+import { bake, type Material } from './materials'
 import { SANS, SERIF, layoutLabel } from './tex'
 
 type Pair = [fill: string, stroke: string]
 export interface Theme {
   bg: string; text: string; sub: string; edge: string; halo: string; group: Pair; shadow: string; dark: boolean
+  /** blocks without a color: neutral grey, readable on light and dark pages */
+  none: Pair
   ice: [string, string, string, string]; fire: [string, string, string]; c: Record<string, Pair>
 }
 
 export const THEMES: Record<string, Theme> = {
   light: {
-    bg: 'none', text: '#1d2430', sub: '#5b6474', edge: '#39414f', halo: '#fff', group: ['#f5f6f9', '#d5dae2'], shadow: 'rgba(30,40,60,.10)', dark: false,
+    none: ['#e2e5e9', '#7f8794'], bg: 'none', text: '#1d2430', sub: '#5b6474', edge: '#39414f', halo: '#fff', group: ['#f5f6f9', '#d5dae2'], shadow: 'rgba(30,40,60,.10)', dark: false,
     ice: ['#f7fdff', '#d2effb', '#aedcf2', '#6fb9de'], fire: ['#fff6e8', '#ffcf9f', '#ee7d36'],
     c: {
       white: ['#ffffff', '#8b95a5'], gray: ['#eceff3', '#9aa3b2'], pink: ['#fde1e4', '#e58c98'], orange: ['#fde4c8', '#e69a50'],
@@ -20,7 +22,7 @@ export const THEMES: Record<string, Theme> = {
     },
   },
   dark: {
-    bg: '#0e1117', text: '#e8edf5', sub: '#9aa4b5', edge: '#c3cad6', halo: '#0e1117', group: ['#161a22', '#2b323f'], shadow: 'rgba(0,0,0,.45)', dark: true,
+    none: ['#2a2f37', '#8a93a2'], bg: '#0e1117', text: '#e8edf5', sub: '#9aa4b5', edge: '#c3cad6', halo: '#0e1117', group: ['#161a22', '#2b323f'], shadow: 'rgba(0,0,0,.45)', dark: true,
     ice: ['#29506a', '#163a50', '#0f2c3e', '#7fd4ff'], fire: ['#4a2a12', '#33180a', '#ff9447'],
     c: {
       white: ['#1b2029', '#7d8799'], gray: ['#1f242d', '#8792a4'], pink: ['#3a1e29', '#ff8ea2'], orange: ['#3a2916', '#ffae5c'],
@@ -72,13 +74,13 @@ export function render(d: Diagram, theme?: string, materials = true): string {
   const box = (x: number, y: number, w = 0, h = 0) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x + w); y1 = Math.max(y1, y + h) }
 
   const pair = (c?: string): Pair => {
-    if (!c) return th.c.white
+    if (!c) return th.none
     if (th.c[c]) return th.c[c]
     if (c[0] === '#') return [th.dark ? mix(c, '#0e1117', 0.75) : mix(c, '#ffffff', 0.78), c]
     return [c, th.edge]
   }
   const grad = (c?: string) => {
-    const key = 'c-' + (c ?? 'white').replace('#', '')
+    const key = 'c-' + (c ?? 'none').replace('#', '')
     if (!defs.has(key)) {
       const [fill, stroke] = pair(c)
       const top = th.dark ? mix(fill, stroke, 0.16) : mix(fill, '#ffffff', 0.6)
@@ -98,10 +100,13 @@ export function render(d: Diagram, theme?: string, materials = true): string {
     defs.set('fire', `<linearGradient id="${P}fire" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient>` +
       `<linearGradient id="${P}flame" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd24a"/><stop offset=".6" stop-color="${c}"/><stop offset="1" stop-color="#e0452b"/></linearGradient>`)
   }
-  const look = (n: { color?: string; flags: Set<string> }) => {
-    if (n.flags.has('frozen')) { iceDefs(); return { fill: `url(#${P}ice)`, stroke: th.ice[3], fx: 'ice' } }
-    if (n.flags.has('train')) { fireDefs(); return { fill: `url(#${P}fire)`, stroke: th.fire[2], fx: 'fire' } }
-    return { fill: grad(n.color), stroke: pair(n.color)[1], fx: '' }
+  // texture: explicit `texture` attr, else frozen → ice, train → magma
+  const look = (n: { color?: string; flags: Set<string>; attrs: Record<string, string> }) => {
+    const fx = n.attrs.texture ?? (n.flags.has('frozen') ? 'ice' : n.flags.has('train') ? 'magma' : '')
+    if (fx === 'ice') { iceDefs(); return { fill: `url(#${P}ice)`, stroke: th.ice[3], fx } }
+    if (fx === 'magma') { fireDefs(); return { fill: `url(#${P}fire)`, stroke: th.fire[2], fx } }
+    if (fx === 'metal') return { fill: grad(n.color), stroke: th.dark ? '#9aa3ae' : '#6d747d', fx }
+    return { fill: grad(n.color), stroke: pair(n.color)[1], fx }
   }
 
   const text = (label: string, cx: number, cy: number, size: number, weight: number, color: string, anchor: 'start' | 'middle' | 'end' = 'middle') => {
@@ -123,21 +128,62 @@ export function render(d: Diagram, theme?: string, materials = true): string {
     return s`<text font-size="${size}" font-weight="${weight}" fill="${color}" style="white-space:pre">${o}</text>`
   }
 
-  const badge = (fx: string, x: number, y: number) =>
-    fx === 'ice'
-      ? s`<g transform="translate(${x},${y})"><circle r="7.5" fill="${th.dark ? '#0f2c3e' : '#fff'}" stroke="${th.ice[3]}"/><path d="M0-4.6V4.6M-4 -2.3 4 2.3M-4 2.3 4-2.3M-1.4-3.6 0-2.4 1.4-3.6M-1.4 3.6 0 2.4 1.4 3.6" fill="none" stroke="${th.ice[3]}" stroke-width="1.1" stroke-linecap="round"/></g>`
-      : fx === 'fire'
-        ? s`<g transform="translate(${x},${y})"><circle r="7.5" fill="${th.dark ? '#33180a' : '#fff'}" stroke="${th.fire[2]}"/><path d="M0.4-5C3 -2.4 3.9-.2 3.1 2.2 2.5 4.1-2.3 4.3-3 2.1-3.6.2-2.2-1.2-1.6-2.6-.9-1.4-.3-.9.2-.6.9-2 .9-3.5.4-5z" fill="url(#${P}flame)"/></g>`
-        : ''
+  // the badge says frozen / trainable, independent of the texture
+  const mark = (n: { flags: Set<string> }, fx: string) =>
+    n.flags.has('frozen') ? 'ice' : n.flags.has('train') ? 'magma' : fx === 'ice' || fx === 'magma' ? fx : ''
+  const badge = (fx: string, x: number, y: number) => {
+    if (fx === 'ice') return s`<g transform="translate(${x},${y})"><circle r="7.5" fill="${th.dark ? '#0f2c3e' : '#fff'}" stroke="${th.ice[3]}"/><path d="M0-4.6V4.6M-4 -2.3 4 2.3M-4 2.3 4-2.3M-1.4-3.6 0-2.4 1.4-3.6M-1.4 3.6 0 2.4 1.4 3.6" fill="none" stroke="${th.ice[3]}" stroke-width="1.1" stroke-linecap="round"/></g>`
+    if (fx !== 'magma') return ''
+    fireDefs()
+    return s`<g transform="translate(${x},${y})"><circle r="7.5" fill="${th.dark ? '#33180a' : '#fff'}" stroke="${th.fire[2]}"/><path d="M0.4-5C3 -2.4 3.9-.2 3.1 2.2 2.5 4.1-2.3 4.3-3 2.1-3.6.2-2.2-1.2-1.6-2.6-.9-1.4-.3-.9.2-.6.9-2 .9-3.5.4-5z" fill="url(#${P}flame)"/></g>`
+  }
   // baked WebGL material clipped to the shape's outline; '' when unavailable
   let clips = 0
-  const material = (fx: string, d: string, x: number, y: number, w: number, h: number) => {
-    const url = materials && fx ? bake(fx === 'ice' ? 'ice' : 'heat', w, h) : null
-    if (!url) return ''
+  const SHADER: Record<string, Material> = { ice: 'ice', magma: 'heat', glass: 'glass', metal: 'metal', noise: 'noise' }
+  const material = (fx: string, d: string, x: number, y: number, w: number, h: number, color?: string) => {
+    if (PATTERN.has(fx)) return `<path d="${d}" fill="${pattern(fx, color)}"/>`
+    const url = materials && SHADER[fx] ? bake(SHADER[fx], w, h) : null
+    if (!url) {
+      // vector stand-ins without WebGL (ice and magma have their own below)
+      if (fx === 'noise') return `<path d="${d}" fill="${pattern('grain', color)}"/>`
+      if (fx === 'glass') return `<path d="${d}" fill="#fff" fill-opacity="${th.dark ? 0.12 : 0.4}"/>`
+      if (fx === 'metal') return `<path d="${d}" fill="${metal()}"/>`
+      return ''
+    }
     const key = `m-${fx}-${Math.round(w)}x${Math.round(h)}`
     if (!defs.has(key)) defs.set(key, s`<image id="${P}${key}" width="${Math.round(w)}" height="${Math.round(h)}" preserveAspectRatio="none" href="${url}"/>`)
     const id = `${P}k${clips++}`
     return `<clipPath id="${id}"><path d="${d}"/></clipPath><g clip-path="url(#${id})">` + s`<use href="#${P}${key}" x="${x}" y="${y}"/></g>`
+  }
+  // crisp vector textures, one <pattern> per (kind, color)
+  const PATTERN = new Set(['quantized', 'sparse', 'hatch'])
+  const pattern = (kind: string, color?: string) => {
+    const key = `p-${kind}-${(color ?? 'none').replace('#', '')}`
+    if (!defs.has(key)) {
+      const [c0, c1] = pair(color)
+      let tile = 24, body = '', rot = ''
+      if (kind === 'quantized') {
+        // 4-level mosaic: weights snapped to a few values
+        tile = 32
+        ;[0, 2, 1, 3, 2, 0, 3, 1, 1, 3, 0, 2, 3, 1, 2, 0].forEach((l, i) => { body += `<rect x="${(i % 4) * 8}" y="${(i >> 2) * 8}" width="8" height="8" fill="${mix(c0, c1, (l / 3) * 0.7)}"/>` })
+      } else if (kind === 'sparse') {
+        // a weight grid with pruned entries missing
+        ;[1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 1].forEach((k, i) => { if (k) body += `<circle cx="${(i % 4) * 6 + 3}" cy="${(i >> 2) * 6 + 3}" r="1.5" fill="${c1}" fill-opacity=".75"/>` })
+      } else if (kind === 'hatch') {
+        tile = 7; rot = ' patternTransform="rotate(45)"'
+        body = `<path d="M0 0V7" stroke="${c1}" stroke-opacity=".55" stroke-width="1.4"/>`
+      } else {
+        // grain: the no-WebGL stand-in for noise
+        tile = 24
+        for (let i = 0; i < 64; i++) body += `<rect x="${(i % 8) * 3}" y="${(i >> 3) * 3}" width="3" height="3" fill="${['#000', '#fff'][(i * 37) % 7 > 3 ? 1 : 0]}" fill-opacity="${0.08 + ((i * 53) % 11) / 40}"/>`
+      }
+      defs.set(key, `<pattern id="${P}${key}" width="${tile}" height="${tile}" patternUnits="userSpaceOnUse"${rot}>${body}</pattern>`)
+    }
+    return `url(#${P}${key})`
+  }
+  const metal = () => {
+    if (!defs.has('metal')) defs.set('metal', `<linearGradient id="${P}metal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e4e7eb"/><stop offset=".45" stop-color="#a7adb5"/><stop offset=".55" stop-color="#cfd3d8"/><stop offset="1" stop-color="#8d949d"/></linearGradient>`)
+    return `url(#${P}metal)`
   }
   // frost along the top edge of a rounded rect
   const snow = (x: number, y: number, w: number, r: number) => {
@@ -165,17 +211,22 @@ export function render(d: Diagram, theme?: string, materials = true): string {
         o += s`<path d="${d}" transform="translate(${k * 5},${-k * 5})" ${paint} opacity="${0.35 + 0.5 / (k + 1)}"/>`
       if (!th.dark || fx) o += s`<path d="${d}" transform="translate(0,1.6)" fill="${th.shadow}"/>`
       o += `<path d="${d}" ${paint}/>`
-      const m = material(fx, d, r[0], r[1], r[2], r[3])
+      const m = material(fx, d, r[0], r[1], r[2], r[3], n.color)
       if (m) { baked = true; o += m + `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${sw}" stroke-opacity=".7"${dash}/>` }
       else if (fx === 'ice') o += `<path d="${d}" fill="url(#${P}frost)"/>` + (snowy ? snow(r[0], r[1], r[2], snowy) : '')
       box(L, T - ghosts * 5, n.w + ghosts * 5, n.h + ghosts * 5)
       return o
     }
     let o = ''
-    // text on magma needs to be light, with a dark halo to stay readable over the cracks
-    const label = () => baked && fx === 'fire'
-      ? `<g paint-order="stroke" stroke="#1a0d07" stroke-width="3" stroke-linejoin="round">${text(n.label, n.x, n.y, n.shape === 'thin' ? FS - 1 : FS, 600, '#fff4e8')}</g>`
-      : text(n.label, n.x, n.y, n.shape === 'thin' ? FS - 1 : FS, 500, th.text)
+    // text on magma needs to be light, with a dark halo to stay readable over the cracks;
+    // busy textures get a halo in the page color
+    const size = n.shape === 'thin' ? FS - 1 : FS
+    const [ink, halo] = fx === 'metal' ? ['#1d2430', '#e8ebee'] : [th.text, th.halo] // metal is light in both themes
+    const label = () => baked && fx === 'magma'
+      ? `<g paint-order="stroke" stroke="#1a0d07" stroke-width="3" stroke-linejoin="round">${text(n.label, n.x, n.y, size, 600, '#fff4e8')}</g>`
+      : baked && fx !== 'ice' && fx !== 'glass'
+        ? `<g paint-order="stroke" stroke="${halo}" stroke-width="3" stroke-linejoin="round" stroke-opacity=".85">${text(n.label, n.x, n.y, size, 600, ink)}</g>`
+        : text(n.label, n.x, n.y, size, 500, th.text)
     switch (n.shape) {
       case 'text': o = label(); break
       case 'op': {
@@ -305,7 +356,7 @@ export function render(d: Diagram, theme?: string, materials = true): string {
         break
       }
       case 'sphere': {
-        const [c0, c1] = pair(n.color), R = Math.min(n.w, n.h) / 2 - 2, key = 'sph-' + (n.color ?? 'white').replace('#', '')
+        const [c0, c1] = pair(n.color), R = Math.min(n.w, n.h) / 2 - 2, key = 'sph-' + (n.color ?? 'none').replace('#', '')
         if (!defs.has(key)) defs.set(key, `<radialGradient id="${P}${key}" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="${th.dark ? mix(c0, c1, 0.35) : '#ffffff'}"/><stop offset=".55" stop-color="${c0}"/><stop offset="1" stop-color="${mix(c0, c1, 0.35)}"/></radialGradient>`)
         o += s`<circle cx="${n.x}" cy="${n.y}" r="${R}" fill="url(#${P}${key})" stroke="${c1}"/>`
         let front = '', back = ''
@@ -337,9 +388,10 @@ export function render(d: Diagram, theme?: string, materials = true): string {
     }
     if (OUTSIDE.has(n.shape) && n.label) o += text(n.label, n.x, T - (ghosts * 5) - 11, FS - 1, 500, th.sub)
     if (n.attrs.caption) o += text(n.attrs.caption, n.x, n.y + n.h / 2 + 12, FS - 1, 400, th.sub)
-    if (fx) {
+    const b = mark(n, fx)
+    if (b) {
       const round = n.shape === 'op' || n.shape === 'var'
-      o += round ? badge(fx, n.x + n.w * 0.36, n.y - n.h * 0.36) : badge(fx, L + n.w - 2, T + 2)
+      o += round ? badge(b, n.x + n.w * 0.36, n.y - n.h * 0.36) : badge(b, L + n.w - 2, T + 2)
     }
     return `<g>${o}</g>`
   }
@@ -400,11 +452,11 @@ export function render(d: Diagram, theme?: string, materials = true): string {
   // --- groups
   const drawGroup = (g: Group) => {
     if (!g.w) return ''
-    const { fill, stroke, fx } = g.flags.has('frozen') || g.flags.has('train') ? look(g) : { fill: g.attrs.color ? pair(g.attrs.color)[0] : th.group[0], stroke: g.attrs.color ? pair(g.attrs.color)[1] : th.group[1], fx: '' }
+    const { fill, stroke, fx } = g.attrs.texture || g.flags.has('frozen') || g.flags.has('train') ? look(g) : { fill: g.attrs.color ? pair(g.attrs.color)[0] : th.group[0], stroke: g.attrs.color ? pair(g.attrs.color)[1] : th.group[1], fx: '' }
     const dash = g.flags.has('dashed') ? ' stroke-dasharray="5 4"' : ''
     const d = rr(g.x, g.y, g.w, g.h, 12)
     let o = `<path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="1.2"${dash}/>`
-    const m = material(fx, d, g.x, g.y, g.w, g.h)
+    const m = material(fx, d, g.x, g.y, g.w, g.h, g.attrs.color)
     if (m) o += m + `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="1.2" stroke-opacity=".7"/>`
     else if (fx === 'ice') o += `<path d="${d}" fill="url(#${P}frost)"/>` + snow(g.x, g.y, g.w, 12)
     box(g.x, g.y, g.w, g.h)
@@ -414,7 +466,7 @@ export function render(d: Diagram, theme?: string, materials = true): string {
       const right = g.x + g.w / 2 > cx
       o += text(g.attrs.repeat, right ? g.x + g.w + 10 : g.x - 10, g.y + g.h / 2, FS + 2, 500, th.text, right ? 'start' : 'end')
     }
-    if (fx) o += badge(fx, g.x + g.w - 2, g.y + 2)
+    o += badge(mark(g, fx), g.x + g.w - 2, g.y + 2)
     return o
   }
 

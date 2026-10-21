@@ -60,7 +60,23 @@ All layers take `(label?, options?)` or `(options?)`.
   - `sphere({ points })`: points on a hypersphere.
 - Images: `image(src, label?, { size, fit: 'cover' | 'contain', grid, n })`. `src` can be a URL, a data URL, an `<img>` or a `<canvas>`. `grid` draws a ViT-style patch grid, and `n` draws a batch of frames.
 
-Common options: `color` `frozen` `train` `dashed` `bold` `w` `h` `ghost` `caption` `id`
+Common options: `color` `texture` `frozen` `train` `dashed` `bold` `w` `h` `ghost` `caption` `id`
+
+- `color`: a palette name (`pink orange yellow green blue purple teal red gray white`) or `#hex`. If it's omitted, the block is a neutral grey that reads on both light and dark pages.
+- `texture` sets a block's surface. Set it on a module to style its group box.
+
+  | texture | Look | Example use |
+  |---|---|---|
+  | `ice` | Clear ice (WebGL) | Frozen weights. This is what `freeze()` gives |
+  | `magma` | Cracked magma (WebGL) | Trainable weights. This is what `train()` gives |
+  | `glass` | Frosted glass that keeps the block's colour (WebGL) | Soft prompts, adapters |
+  | `metal` | Brushed metal (WebGL) | Fixed ops, hardware |
+  | `noise` | Gaussian grain (WebGL) | Noise injection, diffusion |
+  | `quantized` | A 4-level mosaic of the block's colour (SVG) | Low-bit weights |
+  | `sparse` | A dot grid with gaps (SVG) | Pruning, sparsity |
+  | `hatch` | Diagonal lines (SVG) | Masked, stop-gradient |
+
+  When both are set, `texture` decides the surface, and the ❄/🔥 badge follows `freeze()` / `train()` (for example `block({ texture: 'quantized' }).freeze()` in QLoRA). Without WebGL, glass, metal and noise fall back to lightweight vector versions.
 
 - Placement is automatic by default. To override it, use `lane` (fractions allowed), `align: ref`, `leftOf` / `rightOf` / `above` / `below: ref` (with `dist`), `at: [x, y]` or `nudge: [dx, dy]`.
 - `freeze()` / `train()` can be called on a layer or on a module. On a module they apply to every block inside it, unless a layer is marked explicitly.

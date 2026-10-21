@@ -57,6 +57,13 @@
   .plate .cap span { color:var(--muted); }
   code { font:.9em var(--mono); }
 
+  .textures { margin:72px 0 0; }
+  .textures .lede { color:var(--muted); max-width:62ch; margin:-6px 0 18px; }
+  .swatches { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; }
+  .swatches li { background:var(--plate); border:1px solid var(--rule); border-radius:6px; padding:16px 14px 12px; display:flex; flex-direction:column; align-items:center; gap:10px; }
+  .swatches svg { width:100%; height:auto; max-width:170px; }
+  .swatches p { margin:0; font:14px/1.4 var(--serif); color:var(--muted); text-align:center; }
+  .swatches p b { color:var(--ink); font-weight:600; }
   .use { margin:72px 0 0; display:grid; grid-template-columns:minmax(0,4fr) minmax(0,8fr); gap:32px; align-items:start; }
   .use h2 { font:400 34px/1.1 var(--serif); margin:0 0 10px; }
   .use p { color:var(--muted); margin:0; max-width:40ch; }
@@ -121,6 +128,12 @@ return fig</textarea>
       <div class="filters" id="filters" role="group" aria-label="Filter figures"></div>
     </div>
     <ul class="plates" id="plates"></ul>
+  </section>
+
+  <section class="textures" aria-labelledby="tex-h">
+    <div class="head"><h2 id="tex-h">Textures</h2></div>
+    <p class="lede">Set <code>texture</code> on any block, or on a module for its group box. <code>freeze()</code> and <code>train()</code> give ice and magma and add the badge; the other textures leave the badge to them.</p>
+    <ul class="swatches" id="swatches"></ul>
   </section>
 
   <section class="use">
@@ -286,6 +299,22 @@ fig.mount('#figure')</pre>
   "cite": "Liu et al., Visual Instruction Tuning (2023)",
   "fig": "Fig. 1, stage 1 (feature alignment)",
   "src": "const fig = new Figure({ flow: 'BT' })\nconst tokens = (name, color) => vector([`$\\\\mathbf{${name[0]}}_\\\\text{${name[1]}}$`, '', '', ''], { color })\n\nconst img = fig.input(image(demoImage('photo'), { size: [64, 48], caption: 'Image $\\\\mathbf{X}_\\\\text{v}$' }))\nconst instruction = fig.input('Language Instruction $\\\\mathbf{X}_\\\\text{q}$')\n\nconst Zv = tokens('Zv', 'gray')(enc('Vision Encoder', { w: 150 }).freeze()(img))\nconst Hv = tokens('Hv', 'orange')(thin('Projection $\\\\mathbf{W}$').train()(Zv))\nconst Hq = tokens('Hq', 'blue')(instruction)\nfig.rank(Hv, Hq)\n\nconst llm = block('Language Model $f_\\\\phi$', { w: 330, h: 56, lane: 0.5 }).freeze()\ntext('Language Response $\\\\mathbf{X}_\\\\text{a}$', { lane: 0.5 })(llm(Hv, Hq))\nreturn fig"
+ },
+ {
+  "t": "QLoRA",
+  "cat": "Multimodal",
+  "url": "https://arxiv.org/abs/2305.14314",
+  "cite": "Dettmers et al., QLoRA: Efficient Finetuning of Quantized LLMs (2023)",
+  "fig": "Fig. 1",
+  "src": "const fig = new Figure({ flow: 'BT' })\nconst x = fig.input('$\\\\mathbf{X}^\\\\text{BF16}$')\n\n// frozen base weights stored in 4 bits: the texture says how, the badge says frozen\nconst W = block('4-bit NormalFloat\\n$\\\\mathbf{W}^\\\\text{NF4}$', { texture: 'quantized', color: 'blue', w: 170, h: 70 }).freeze()\nconst L1 = thin('$\\\\mathbf{L}_1$ BF16').train()\nconst L2 = thin('$\\\\mathbf{L}_2$ BF16').train()\n\ntext('$\\\\mathbf{Y}^\\\\text{BF16}$')(add(W(x), L2(L1(x).edge('$r$'))))\nreturn fig"
+ },
+ {
+  "t": "Prompt Tuning",
+  "cat": "Multimodal",
+  "url": "https://arxiv.org/abs/2104.08691",
+  "cite": "Lester et al., The Power of Scale for Parameter-Efficient Prompt Tuning (2021)",
+  "fig": "Fig. 2",
+  "src": "const fig = new Figure({ flow: 'BT' })\n// learned soft prompt (glass, trainable) in front of the frozen model's input\nconst prompt = fig.input(vector(['$P_1$', '$P_2$', '$P_3$'], { texture: 'glass', color: 'orange', train: true, caption: 'soft prompt' }))\nconst tokens = fig.input(vector(['$x_1$', '$x_2$', '$\\\\cdots$', '$x_n$'], { color: 'gray', caption: 'input tokens' }))\n\nconst model = block('Pre-trained Model (11B)', { w: 280, h: 56, lane: 0.5 }).freeze()\ntext('Output', { lane: 0.5 })(model(prompt, tokens))\nreturn fig"
  }
 ]</script>
 <script type="module">
@@ -332,6 +361,8 @@ fig.mount('#figure')</pre>
   const svgOf = code => build(code).svg({ theme: theme() })
   const root = document.documentElement
   const FIGS = JSON.parse($('figs').textContent)
+  const TEXTURES = [['ice', 'frozen weights'], ['magma', 'trainable weights'], ['glass', 'soft prompts, adapters'], ['metal', 'fixed ops, hardware'],
+    ['noise', 'noise injection, diffusion'], ['quantized', 'low-bit weights'], ['sparse', 'pruned weights'], ['hatch', 'masked, stop-gradient']]
   const theme = () => root.dataset.theme ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
   const caption = (f, i) => `<b>Figure ${i + 1}.</b> ${f.t}. <span><a href="${f.url}">${f.cite}</a>${f.fig ? `, ${f.fig}` : ''}.</span>`
 
@@ -383,6 +414,11 @@ fig.mount('#figure')</pre>
     for (const b of $('plates').querySelectorAll('button.fig')) {
       try { b.innerHTML = svgOf(FIGS[+b.dataset.i].src) } catch (e) { b.textContent = e.message }
     }
+    $('swatches').innerHTML = TEXTURES.map(([t, use]) => {
+      const f = new mm.Figure({ theme: theme() })
+      f.input(mm.block(t, { texture: t, w: 150, h: 60 }))
+      return `<li>${f.svg()}<p><b>${t}</b> ${use}</p></li>`
+    }).join('')
     if ($('view').open) show(open)
     $('theme').textContent = theme() === 'dark' ? 'Light mode' : 'Dark mode'
   }

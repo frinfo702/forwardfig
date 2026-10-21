@@ -12,6 +12,14 @@ import type { Diagram, Dir, Edge, Group, Node } from './types'
 type V2 = [number, number]
 export type Ref = Tensor | Layer<any>
 
+/**
+ * Surface of a block. ice / magma are what freeze() / train() give; the rest are
+ * for whatever a figure wants to call out:
+ * glass (soft prompts, adapters), metal (fixed ops, hardware), noise (noise
+ * injection, diffusion), quantized (low-bit weights), sparse (pruned), hatch (masked).
+ */
+export type Texture = 'ice' | 'magma' | 'glass' | 'metal' | 'noise' | 'quantized' | 'sparse' | 'hatch'
+
 export interface NodeOptions {
   id?: string
   /** palette name (pink orange yellow green blue purple teal red gray white) or #hex */
@@ -20,6 +28,8 @@ export interface NodeOptions {
   frozen?: boolean
   /** 🔥 trainable weights (magma) */
   train?: boolean
+  /** surface texture; wins over frozen / train */
+  texture?: Texture
   dashed?: boolean
   bold?: boolean
   w?: number
@@ -123,7 +133,7 @@ export class Graph {
       const parent = [...this.scope].reverse().map(p => this.groups.get(p)).find(Boolean)
       this.groups.set(m, {
         id: o.id ?? `g${this.groups.size}`, label: o.label ?? '', parent: parent?.id,
-        flags: new Set(o.dashed ? ['dashed'] : []), attrs: { ...(o.repeat && { repeat: o.repeat }), ...(o.color && { color: o.color }) },
+        flags: new Set(o.dashed ? ['dashed'] : []), attrs: { ...(o.repeat && { repeat: o.repeat }), ...(o.color && { color: o.color }), ...(o.texture && { texture: o.texture }) },
         x: 0, y: 0, w: 0, h: 0,
       })
     }
@@ -239,6 +249,8 @@ export interface ModuleOptions {
   box?: boolean
   color?: string
   dashed?: boolean
+  /** texture of the group box */
+  texture?: Texture
 }
 
 export interface Module<O = Tensor> {
