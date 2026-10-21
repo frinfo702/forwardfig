@@ -298,7 +298,7 @@ test('tilted / rotated images: layout box grows to the transformed frame', () =>
   expect(turned.w).toBeCloseTo(40, 1)
   expect(turned.h).toBeCloseTo(60, 1)
   const svg = figure({}, fig => { fig.input(image('data:image/png;base64,AA==', { tilt: 30, n: 3 })) }).svg()
-  expect(svg).toMatch(/transform="matrix\(0\.8660 0\.1750 0\.0000 1\.0000 /)
+  expect(svg).toMatch(/transform="matrix\(0\.8660 -0\.1750 0\.0000 1\.0000 /)
 })
 
 test('export: svg blob anywhere; raster formats need a browser', async () => {

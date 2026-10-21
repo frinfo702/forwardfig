@@ -67,7 +67,7 @@ export interface ImageOptions extends NodeOptions {
   grid?: number
   /** draw a batch of n frames */
   n?: number
-  /** degrees: turn the image around its vertical axis, drawn obliquely (negative turns the other way) */
+  /** degrees: turn the image around its vertical axis, drawn obliquely; positive sends the right edge back (up), negative the left */
   tilt?: number
   /** degrees: rotate in-plane */
   rotate?: number

@@ -60,7 +60,7 @@ All layers take `(label?, options?)` or `(options?)`.
   - `sphere({ points })`: points on a hypersphere.
   - `pointcloud({ points: [[x, y, z, class?]], shape: 'torus' | 'sphere' | 'cube', n })`: a point cloud. Closer points are drawn larger and darker. When `points` is omitted, they're sampled from `shape`.
 - Signals: `waveform({ samples })`. `samples` takes raw audio in [-1, 1] (`number[]` or `Float32Array`). Long signals are reduced to at most 256 min/max columns, so the SVG stays light. When omitted, a synthetic speech-like waveform is drawn.
-- Images: `image(src, label?, { size, fit: 'cover' | 'contain', grid, n, tilt, rotate })`. `src` can be a URL, a data URL, an `<img>` or a `<canvas>`. `grid` draws a ViT-style patch grid, and `n` draws a batch of frames. `tilt` (degrees) turns the image around its vertical axis and draws it obliquely; combined with `n`, it reads as a video volume. `rotate` (degrees) rotates it in-plane. The layout uses the transformed frame's bounding box.
+- Images: `image(src, label?, { size, fit: 'cover' | 'contain', grid, n, tilt, rotate })`. `src` can be a URL, a data URL, an `<img>` or a `<canvas>`. `grid` draws a ViT-style patch grid, and `n` draws a batch of frames. `tilt` (degrees) turns the image around its vertical axis and draws it obliquely; a positive value sends the right edge back (up), a negative one the left; combined with `n`, it reads as a video volume. `rotate` (degrees) rotates it in-plane. The layout uses the transformed frame's bounding box.
 
 Common options: `color` `texture` `frozen` `train` `crossed` `dashed` `bold` `w` `h` `ghost` `caption` `id`
 

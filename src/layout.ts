@@ -14,12 +14,13 @@ export const labelSize = (n: Node, base: number) =>
   +n.attrs.fontSize || (n.shape === 'thin' || n.shape === 'vector' || OUTSIDE.has(n.shape) ? base - 1 : base)
 /**
  * Linear part [a, b, c, d] of an image's transform (x' = a·x + c·y, y' = b·x + d·y).
- * tilt: turn around the vertical axis, drawn obliquely (x shrinks, the far side drops);
+ * tilt: turn around the vertical axis, drawn obliquely (x shrinks, the far side rises,
+ * as depth does in an oblique drawing);
  * rotate: in-plane. Both in degrees.
  */
 export const imageMatrix = (attrs: Record<string, string>): [number, number, number, number] => {
   const t = ((+attrs.tilt || 0) * Math.PI) / 180, r = ((+attrs.rotate || 0) * Math.PI) / 180
-  const [ta, tb] = [Math.cos(t), Math.sin(t) * 0.35], [cr, sr] = [Math.cos(r), Math.sin(r)]
+  const [ta, tb] = [Math.cos(t), -Math.sin(t) * 0.35], [cr, sr] = [Math.cos(r), Math.sin(r)]
   return [cr * ta - sr * tb, sr * ta + cr * tb, -sr, cr]
 }
 export const nums = (s: string | undefined, def: number[]) => (s ? s.split(',').map(Number) : def)
