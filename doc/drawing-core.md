@@ -54,7 +54,7 @@ interface Group {
 }
 ```
 
-`shape` is one of `block thin text circle op enc dec tensor stack neurons vector matrix voxels image magnify gaussian space sphere pointcloud waveform`. Shape-specific data lives in `attrs` as strings: numbers as `"12"`, number lists as `"36,64,20"`, structured data as JSON.
+`shape` is one of `block thin text circle op enc dec tensor stack neurons vector matrix voxels image magnify gaussian space sphere pointcloud waveform plot empty`. Shape-specific data lives in `attrs` as strings: numbers as `"12"`, number lists as `"36,64,20"`, structured data as JSON.
 
 ## How it works
 

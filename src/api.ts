@@ -136,6 +136,34 @@ export interface WaveformOptions extends NodeOptions {
   samples?: ArrayLike<number>
   size?: V2
 }
+export interface PlotOptions extends NodeOptions {
+  /** domain [min, max] (default [-1, 1]) */
+  x?: V2
+  /** range [min, max]; default: the sampled min and max */
+  y?: V2
+  /** x and y axes through the origin, or along the edge when 0 is out of range (default true) */
+  axes?: boolean
+  /** points sampled across the domain (default 100) */
+  samples?: number
+  size?: V2
+  /** scatter series: [x, y] points drawn with a marker, like matplotlib's scatter */
+  points?: PlotSeries[]
+  /** the curve's name in the legend */
+  name?: string
+  /** a key inside the box, for the curve (with `name`) and each labelled series; in the corner that covers the fewest points */
+  legend?: boolean
+}
+export type Marker = 'circle' | 'square' | 'triangle' | 'diamond' | 'star' | 'cross'
+export interface PlotSeries {
+  at: V2[]
+  /** default: circle, square, triangle, ... by series */
+  marker?: Marker
+  /** default: red, green, orange, ... by series */
+  color?: string
+  label?: string
+  /** marker radius in px (default 3) */
+  size?: number
+}
 export interface SphereOptions extends NodeOptions {
   /** directions [x, y, z, class?]; normalized onto the sphere */
   points?: number[][]
@@ -235,7 +263,7 @@ const graphOf = (xs: Tensor[], who: string) => {
 // --- layers
 
 export type Shape = 'block' | 'thin' | 'text' | 'circle' | 'op' | 'enc' | 'dec' | 'tensor' | 'stack' | 'neurons' | 'empty'
-  | 'vector' | 'matrix' | 'voxels' | 'image' | 'magnify' | 'gaussian' | 'space' | 'sphere' | 'pointcloud' | 'waveform'
+  | 'vector' | 'matrix' | 'voxels' | 'image' | 'magnify' | 'gaussian' | 'space' | 'sphere' | 'pointcloud' | 'waveform' | 'plot'
 
 export interface Layer<O extends NodeOptions = NodeOptions> {
   (...inputs: Tensor[]): Tensor
@@ -333,6 +361,25 @@ export function waveform(a?: string | WaveformOptions, b?: WaveformOptions): Lay
     })
   }
   return layer('waveform', label, { ...o, ...(wave && { wave }) } as WaveformOptions, 'waveform', { color: 'teal' })
+}
+
+const MARKERS: Marker[] = ['circle', 'square', 'triangle', 'diamond', 'star', 'cross']
+const SERIES_COLORS = ['red', 'green', 'orange', 'purple', 'teal', 'pink']
+/**
+ * The graph of y = fn(x), e.g. plot(Math.sin, { x: [-Math.PI, Math.PI] }). NaN / ±Infinity break the curve.
+ * `points` adds scatter series, and fn may be left out: plot({ points: [{ at: [[0, 1], [1, 2]], marker: 'star' }] }).
+ */
+export function plot(f?: ((x: number) => number) | string | PlotOptions, a?: string | PlotOptions, b?: PlotOptions): Layer<PlotOptions> {
+  const fn = typeof f === 'function' ? f : undefined
+  if (!fn) [a, b] = [f as string | PlotOptions | undefined, a as PlotOptions] // no fn: the arguments shift left
+  const [label, { samples = 100, ...o }] = typeof a === 'string' ? [a, b ?? {}] : ['', a ?? {}]
+  const points = (o.points ?? []).map((p, i) => ({ ...p, marker: p.marker ?? MARKERS[i % MARKERS.length], color: p.color ?? SERIES_COLORS[i % SERIES_COLORS.length] }))
+  const at = points.flatMap(p => p.at), ext = (v: number[], def: V2): V2 => v.length ? [Math.min(...v), Math.max(...v)] : def
+  // domain: given, else the points' extent, else [-1, 1]
+  const [x0, x1] = o.x ?? ext(at.map(p => p[0]).filter(Number.isFinite), [-1, 1]), k = Math.max(2, Math.round(samples))
+  const ys = fn ? Array.from({ length: k }, (_, i) => Math.round(fn(x0 + ((x1 - x0) * i) / (k - 1)) * 1e4) / 1e4) : []
+  const y = o.y ?? ext([...ys, ...at.map(p => p[1])].filter(Number.isFinite), [-1, 1])
+  return layer('plot', label, { ...o, x: [x0, x1], y, ys, ...(points.length && { points }) } as PlotOptions, 'plot', { color: 'blue' })
 }
 
 export type ImageSource = string | { currentSrc?: string; src?: string } | { toDataURL(type?: string): string }

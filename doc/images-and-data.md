@@ -88,5 +88,48 @@ gaussian('$p(\\mathbf{z})$', { peaks: [[-0.4, 0, 1, 0.35], [0.5, 0.3, 0.7, 0.3]]
 | `sphere` | `points: [[x, y, z, class?]]` | Directions, normalized onto a sphere. |
 | `pointcloud` | `points` or `shape: 'torus' \| 'sphere' \| 'cube'` | Nearer points are larger and darker; `n` points are sampled from `shape`. |
 | `waveform` | `samples: ArrayLike<number>` in [-1, 1] | Reduced to at most 256 min/max columns, so the SVG stays small. |
+| `plot` | `fn: (x) => number` | The graph of y = fn(x). See [Function plots](#function-plots). |
 
 Coordinates are in [-1, 1]. `class` is any number; it picks one of eight colors.
+
+## Function plots
+
+`plot(fn, label?, options?)` draws the graph of y = fn(x) in a box, so arrows connect to it like any other block.
+
+```ts figure
+import { Figure, plot, act } from 'forwardfig'
+
+const fig = new Figure({ flow: 'LR' })
+const x = fig.input(plot(Math.sin, '$\\sin x$', { x: [-Math.PI, Math.PI] }))
+plot(Math.tanh, '$\\tanh$', { x: [-3, 3], color: 'green' })(act('tanh')(x))
+```
+
+| Option | What it does |
+| --- | --- |
+| `x` | Domain `[min, max]` (default `[-1, 1]`). |
+| `y` | Range `[min, max]`. Taken from the samples when omitted; anything outside it is clipped. |
+| `axes` | x and y axes with arrows, through the origin, or along the edge when 0 is out of range (default `true`). |
+| `samples` | Points sampled across the domain (default 100). |
+| `size` | `[w, h]` in px (default `[120, 84]`). |
+| `points` | Scatter series, see below. |
+| `name` | The curve's name in the legend. |
+| `legend` | A key inside the box, in the corner that covers the fewest points (default `false`). |
+
+NaN and ±Infinity break the curve, and so does a jump across the whole range (a pole, as in `tan`). There are no ticks, tick labels or grid.
+
+### Scatter points
+
+`points` draws `[x, y]` points with a marker, like matplotlib's `scatter`. Each series takes `at` (the points), `marker` (`circle`, `square`, `triangle`, `diamond`, `star`, `cross`), `color`, `label` and `size` (marker radius, default 3). Marker and color default to the next one in those lists, series by series. `fn` can be left out for points alone; then `x` defaults to the points' extent, and `y` always covers both the curve and the points. Points outside an explicit `x` / `y` are dropped.
+
+`legend: true` adds a key inside the box, in the corner that covers the fewest points (top right on a tie): the curve, when it has a `name`, and each series with a `label`.
+
+```ts figure
+import { Figure, plot } from 'forwardfig'
+
+const fig = new Figure({ flow: 'LR' })
+const noisy = (d: number) => [-2.5, -1.5, -0.5, 0.5, 1.5, 2.5].map(x => [x + d, Math.sin(x + d) + 0.3 * Math.cos(5 * x)] as [number, number])
+fig.input(plot(Math.sin, 'fit', {
+  x: [-Math.PI, Math.PI], y: [-1.4, 2.4], size: [200, 130], name: '$\\sin x$', legend: true,
+  points: [{ at: noisy(0), label: 'train' }, { at: noisy(0.4), label: 'val', marker: 'triangle' }],
+}))
+```
