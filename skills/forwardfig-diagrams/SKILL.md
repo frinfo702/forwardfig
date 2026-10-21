@@ -58,6 +58,9 @@ your image-reading tool and check:
   enter, not floating in their own column?
 - Is every label readable, not overlapping an arrow or another label?
 - Does each group box contain exactly what it should, and is `N×` placed well?
+- **Is there a large empty region** (a blank quadrant, a box much bigger than
+  what's in it)? It usually means one column was pushed far out by a long
+  edge; move that column or the block that pulled it (§3).
 - **What is the aspect ratio?** A paper figure has to fit a column or a slide.
   Wider than about 2.5 : 1 or taller than about 1 : 2 means it will be shrunk
   until the text is unreadable. Compact it (§3) even if nothing crosses.
@@ -211,6 +214,14 @@ a tensor. See `references/recipes.md` for examples.
 ## Common mistakes
 
 - Expecting two blocks from one reused layer instance (see §1).
+- Calling a block with no inputs: `block('M')()` throws "was called without
+  inputs". Anything with no incoming edge (a state `M_t`, a learned constant,
+  a second input) starts with `fig.input(block('M', {...}))`. To keep it inside
+  a module's box, make it a field (`m = block('M')`) and call
+  `fig.input(this.m)` inside `forward`.
+- Passing an array to a layer or a module: `layer(xs)` / `mod([a, b])` throws
+  "inputs must be Tensors". Spread it: `layer(...xs)`, `mod(a, b)`. `forward()`
+  may *return* an array or object.
 - Forgetting `export default fig` (or exporting a function that returns it) —
   the CLI exits with "exports no Figure".
 - Single backslashes in TeX inside TS strings: `'$\mathbf{x}$'` silently loses
