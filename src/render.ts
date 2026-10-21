@@ -1,0 +1,325 @@
+import type { Diagram, Edge, Group, Node } from './parse'
+import { FS, OUTSIDE, nums } from './layout'
+import { bake } from './materials'
+import { SANS, SERIF, layoutLabel } from './tex'
+
+type Pair = [fill: string, stroke: string]
+export interface Theme {
+  bg: string; text: string; sub: string; edge: string; halo: string; group: Pair; shadow: string; dark: boolean
+  ice: [string, string, string, string]; fire: [string, string, string]; c: Record<string, Pair>
+}
+
+export const THEMES: Record<string, Theme> = {
+  light: {
+    bg: 'none', text: '#1d2430', sub: '#5b6474', edge: '#39414f', halo: '#fff', group: ['#f5f6f9', '#d5dae2'], shadow: 'rgba(30,40,60,.10)', dark: false,
+    ice: ['#f7fdff', '#d2effb', '#aedcf2', '#6fb9de'], fire: ['#fff6e8', '#ffcf9f', '#ee7d36'],
+    c: {
+      white: ['#ffffff', '#8b95a5'], gray: ['#eceff3', '#9aa3b2'], pink: ['#fde1e4', '#e58c98'], orange: ['#fde4c8', '#e69a50'],
+      yellow: ['#f4f5cc', '#c0c064'], green: ['#d8f1de', '#68b880'], blue: ['#d6eafc', '#5f9fd8'], purple: ['#e4defa', '#9584db'],
+      red: ['#ffd7d2', '#dd6559'], teal: ['#d1f0ec', '#48a99f'],
+    },
+  },
+  dark: {
+    bg: '#0e1117', text: '#e8edf5', sub: '#9aa4b5', edge: '#c3cad6', halo: '#0e1117', group: ['#161a22', '#2b323f'], shadow: 'rgba(0,0,0,.45)', dark: true,
+    ice: ['#29506a', '#163a50', '#0f2c3e', '#7fd4ff'], fire: ['#4a2a12', '#33180a', '#ff9447'],
+    c: {
+      white: ['#1b2029', '#7d8799'], gray: ['#1f242d', '#8792a4'], pink: ['#3a1e29', '#ff8ea2'], orange: ['#3a2916', '#ffae5c'],
+      yellow: ['#2f3018', '#e3da66'], green: ['#142e22', '#5ad08a'], blue: ['#13273c', '#5ab1ff'], purple: ['#241e3f', '#a892ff'],
+      red: ['#3c1b19', '#ff786a'], teal: ['#11312f', '#4cd3c3'],
+    },
+  },
+}
+
+// numbers in templates are rounded to 0.1px: keeps the SVG small
+const f = (n: number) => +n.toFixed(1)
+const s = (str: TemplateStringsArray, ...v: unknown[]) => str.reduce((a, b, i) => a + (typeof v[i - 1] === 'number' ? f(v[i - 1] as number) : v[i - 1]) + b)
+const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+const hex = (c: string) => { const m = c.replace('#', ''); const x = m.length === 3 ? [...m].map(k => k + k).join('') : m; return [0, 2, 4].map(i => parseInt(x.slice(i, i + 2), 16)) }
+const mix = (a: string, b: string, t: number) => '#' + hex(a).map((x, i) => Math.round(x + (hex(b)[i] - x) * t).toString(16).padStart(2, '0')).join('')
+
+const rr = (x: number, y: number, w: number, h: number, r: number) => {
+  r = Math.min(r, w / 2, h / 2)
+  return s`M${x + r},${y}h${w - 2 * r}a${r},${r} 0 0 1 ${r},${r}v${h - 2 * r}a${r},${r} 0 0 1 ${-r},${r}h${2 * r - w}a${r},${r} 0 0 1 ${-r},${-r}v${2 * r - h}a${r},${r} 0 0 1 ${r},${-r}z`
+}
+const circ = (x: number, y: number, r: number) => s`M${x - r},${y}a${r},${r} 0 1 0 ${2 * r},0a${r},${r} 0 1 0 ${-2 * r},0z`
+const poly = (...p: number[]) => 'M' + p.map(f).join(',').replace(/([^,]*,[^,]*),/g, '$1L') + 'z'
+
+let uid = 0
+
+export function render(d: Diagram, theme?: string, materials = true): string {
+  const th = THEMES[theme ?? d.theme] ?? THEMES.light
+  const P = `mm${uid++}-`
+  const horiz = d.dir === 'LR' || d.dir === 'RL'
+  const defs = new Map<string, string>()
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+  const box = (x: number, y: number, w = 0, h = 0) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x + w); y1 = Math.max(y1, y + h) }
+
+  const pair = (c?: string): Pair => {
+    if (!c) return th.c.white
+    if (th.c[c]) return th.c[c]
+    if (c[0] === '#') return [th.dark ? mix(c, '#0e1117', 0.75) : mix(c, '#ffffff', 0.78), c]
+    return [c, th.edge]
+  }
+  const grad = (c?: string) => {
+    const key = 'c-' + (c ?? 'white').replace('#', '')
+    if (!defs.has(key)) {
+      const [fill, stroke] = pair(c)
+      const top = th.dark ? mix(fill, stroke, 0.16) : mix(fill, '#ffffff', 0.6)
+      defs.set(key, s`<linearGradient id="${P}${key}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${top}"/><stop offset="1" stop-color="${fill}"/></linearGradient>`)
+    }
+    return `url(#${P}${key})`
+  }
+  const iceDefs = () => {
+    if (defs.has('ice')) return
+    const [a, b, c] = th.ice
+    defs.set('ice', `<linearGradient id="${P}ice" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset=".55" stop-color="${b}"/><stop offset="1" stop-color="${c}"/></linearGradient>` +
+      `<pattern id="${P}frost" width="56" height="56" patternUnits="userSpaceOnUse"><path d="M0 14 16 20 25 6M16 20 22 37 41 33 56 45M41 33 47 12 56 9M22 37 9 56M47 12 33 0" fill="none" stroke="#fff" stroke-opacity="${th.dark ? 0.18 : 0.75}" stroke-width="1"/><path d="M5 30 12 33M30 50 36 46M50 25 54 30" stroke="${th.ice[3]}" stroke-opacity=".35" stroke-width=".8"/></pattern>`)
+  }
+  const fireDefs = () => {
+    if (defs.has('fire')) return
+    const [a, b, c] = th.fire
+    defs.set('fire', `<linearGradient id="${P}fire" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient>` +
+      `<linearGradient id="${P}flame" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd24a"/><stop offset=".6" stop-color="${c}"/><stop offset="1" stop-color="#e0452b"/></linearGradient>`)
+  }
+  const look = (n: { color?: string; flags: Set<string> }) => {
+    if (n.flags.has('frozen')) { iceDefs(); return { fill: `url(#${P}ice)`, stroke: th.ice[3], fx: 'ice' } }
+    if (n.flags.has('train')) { fireDefs(); return { fill: `url(#${P}fire)`, stroke: th.fire[2], fx: 'fire' } }
+    return { fill: grad(n.color), stroke: pair(n.color)[1], fx: '' }
+  }
+
+  const text = (label: string, cx: number, cy: number, size: number, weight: number, color: string, anchor: 'start' | 'middle' | 'end' = 'middle') => {
+    const b = layoutLabel(label, size, weight)
+    let o = ''
+    b.lines.forEach((runs, i) => {
+      const x = anchor === 'middle' ? cx - b.widths[i] / 2 : anchor === 'start' ? cx : cx - b.widths[i]
+      const y = cy - b.h / 2 + (i + 0.5) * b.lh + size * 0.36
+      for (const r of runs) {
+        o += s`<tspan x="${x + r.x}" y="${y + r.dy}"`
+        if (r.size !== size) o += s` font-size="${r.size}"`
+        if (r.it) o += ' font-style="italic"'
+        if (r.serif) o += ` font-family='${SERIF}' font-weight="${r.b ? 700 : 400}"`
+        else if (r.b) o += ' font-weight="700"'
+        o += `>${esc(r.t)}</tspan>`
+      }
+    })
+    box(cx - (anchor === 'middle' ? b.w / 2 : anchor === 'end' ? b.w : 0), cy - b.h / 2, b.w, b.h)
+    return s`<text font-size="${size}" font-weight="${weight}" fill="${color}" style="white-space:pre">${o}</text>`
+  }
+
+  const badge = (fx: string, x: number, y: number) =>
+    fx === 'ice'
+      ? s`<g transform="translate(${x},${y})"><circle r="7.5" fill="${th.dark ? '#0f2c3e' : '#fff'}" stroke="${th.ice[3]}"/><path d="M0-4.6V4.6M-4 -2.3 4 2.3M-4 2.3 4-2.3M-1.4-3.6 0-2.4 1.4-3.6M-1.4 3.6 0 2.4 1.4 3.6" fill="none" stroke="${th.ice[3]}" stroke-width="1.1" stroke-linecap="round"/></g>`
+      : fx === 'fire'
+        ? s`<g transform="translate(${x},${y})"><circle r="7.5" fill="${th.dark ? '#33180a' : '#fff'}" stroke="${th.fire[2]}"/><path d="M0.4-5C3 -2.4 3.9-.2 3.1 2.2 2.5 4.1-2.3 4.3-3 2.1-3.6.2-2.2-1.2-1.6-2.6-.9-1.4-.3-.9.2-.6.9-2 .9-3.5.4-5z" fill="url(#${P}flame)"/></g>`
+        : ''
+  // baked WebGL material clipped to the shape's outline; '' when unavailable
+  let clips = 0
+  const material = (fx: string, d: string, x: number, y: number, w: number, h: number) => {
+    const url = materials && fx ? bake(fx === 'ice' ? 'ice' : 'heat', w, h) : null
+    if (!url) return ''
+    const key = `m-${fx}-${Math.round(w)}x${Math.round(h)}`
+    if (!defs.has(key)) defs.set(key, s`<image id="${P}${key}" width="${Math.round(w)}" height="${Math.round(h)}" preserveAspectRatio="none" href="${url}"/>`)
+    const id = `${P}k${clips++}`
+    return `<clipPath id="${id}"><path d="${d}"/></clipPath><g clip-path="url(#${id})">` + s`<use href="#${P}${key}" x="${x}" y="${y}"/></g>`
+  }
+  // frost along the top edge of a rounded rect
+  const snow = (x: number, y: number, w: number, r: number) => {
+    const a = x + r, b = x + w - r
+    if (b - a < 8) return ''
+    let p = s`M${a},${y + 1}H${b}V${y + 3.5}`
+    const k = Math.max(2, Math.round((b - a) / 9)), st = (b - a) / k
+    for (let i = 0; i < k; i++) p += s`q${-st / 2},${[4, 7, 3.5, 6, 5][i % 5]} ${-st},0`
+    return `<path d="${p}z" fill="#fff" fill-opacity="${th.dark ? 0.55 : 0.92}"/>`
+  }
+
+  // --- nodes
+  const drawNode = (n: Node) => {
+    const L = n.x - n.w / 2, T = n.y - n.h / 2
+    const { fill, stroke, fx } = look(n)
+    const dash = n.flags.has('dashed') ? ' stroke-dasharray="4 3"' : ''
+    const sw = n.flags.has('bold') ? 2 : 1.2
+    const paint = `fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${dash}`
+    const ghosts = +(n.attrs.ghost ?? n.attrs.heads ?? 0)
+    let baked = false
+    // r: the shape's bounding box (for the material), snowy: rounded-rect radius for the snow cap
+    const body = (d: string, r: number[] = [L, T, n.w, n.h], snowy = 0) => {
+      let o = ''
+      for (let k = Math.min(ghosts, 6) - 1; k > 0; k--)
+        o += s`<path d="${d}" transform="translate(${k * 5},${-k * 5})" ${paint} opacity="${0.35 + 0.5 / (k + 1)}"/>`
+      if (!th.dark || fx) o += s`<path d="${d}" transform="translate(0,1.6)" fill="${th.shadow}"/>`
+      o += `<path d="${d}" ${paint}/>`
+      const m = material(fx, d, r[0], r[1], r[2], r[3])
+      if (m) { baked = true; o += m + `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${sw}" stroke-opacity=".7"${dash}/>` }
+      else if (fx === 'ice') o += `<path d="${d}" fill="url(#${P}frost)"/>` + (snowy ? snow(r[0], r[1], r[2], snowy) : '')
+      box(L, T - ghosts * 5, n.w + ghosts * 5, n.h + ghosts * 5)
+      return o
+    }
+    let o = ''
+    // text on magma needs to be light, with a dark halo to stay readable over the cracks
+    const label = () => baked && fx === 'fire'
+      ? `<g paint-order="stroke" stroke="#1a0d07" stroke-width="3" stroke-linejoin="round">${text(n.label, n.x, n.y, n.shape === 'thin' ? FS - 1 : FS, 600, '#fff4e8')}</g>`
+      : text(n.label, n.x, n.y, n.shape === 'thin' ? FS - 1 : FS, 500, th.text)
+    switch (n.shape) {
+      case 'text': o = label(); break
+      case 'op': {
+        o = body(circ(n.x, n.y, 11), [n.x - 11, n.y - 11, 22, 22])
+        const g = n.label === '+' ? s`M${n.x - 6.5},${n.y}h13M${n.x},${n.y - 6.5}v13`
+          : /^[*x×]$/.test(n.label) ? s`M${n.x - 4.6},${n.y - 4.6}l9.2,9.2M${n.x + 4.6},${n.y - 4.6}l-9.2,9.2`
+            : n.label === '~' ? s`M${n.x - 7},${n.y}q3.5,-8 7,0t7,0` : ''
+        o += g ? `<path d="${g}" fill="none" stroke="${stroke}" stroke-width="1.5" stroke-linecap="round"/>` : text(n.label, n.x, n.y, FS, 500, th.text)
+        break
+      }
+      case 'var': o = body(circ(n.x, n.y, n.w / 2), [L, T, n.w, n.h]) + label(); break
+      case 'tensor': {
+        const [W, H, D] = nums(n.attrs.size, [36, 64, 20]), dd = D * 0.6
+        const x = L, y = T + dd, [c0, c1] = pair(n.color)
+        const top = fx === 'ice' ? th.ice[0] : th.dark ? mix(c0, c1, 0.3) : mix(c0, '#fff', 0.5)
+        const side = fx === 'ice' ? th.ice[2] : th.dark ? mix(c0, '#000', 0.25) : mix(c0, c1, 0.35)
+        o = body(rr(x, y, W, H, 1.5), [x, y, W, H]) +
+          `<path d="${poly(x, y, x + dd, y - dd, x + W + dd, y - dd, x + W, y)}" fill="${top}" stroke="${stroke}" stroke-width="1" stroke-linejoin="round"/>` +
+          `<path d="${poly(x + W, y, x + W + dd, y - dd, x + W + dd, y + H - dd, x + W, y + H)}" fill="${side}" stroke="${stroke}" stroke-width="1" stroke-linejoin="round"/>`
+        break
+      }
+      case 'stack': {
+        const [W, H] = nums(n.attrs.size, [44, 60]), k = +n.attrs.n || 4, off = +n.attrs.offset || 7
+        for (let i = 0; i < k; i++) {
+          const d = rr(L + i * off, T + i * off, W, H, 2)
+          o += i === k - 1 ? body(d, [L + i * off, T + i * off, W, H]) : `<path d="${d}" ${paint}/>`
+        }
+        box(L, T, n.w, n.h)
+        break
+      }
+      case 'enc': case 'dec': {
+        const wide = n.shape === 'enc', q = 0.22
+        const d = horiz
+          ? (wide !== (d_rl()) ? poly(L, T, L + n.w, T + n.h * q, L + n.w, T + n.h * (1 - q), L, T + n.h) : poly(L, T + n.h * q, L + n.w, T, L + n.w, T + n.h, L, T + n.h * (1 - q)))
+          : (wide !== (d_bt()) ? poly(L, T, L + n.w, T, L + n.w * (1 - q), T + n.h, L + n.w * q, T + n.h) : poly(L + n.w * q, T, L + n.w * (1 - q), T, L + n.w, T + n.h, L, T + n.h))
+        o = body(d) + label()
+        break
+      }
+      case 'neurons': {
+        const k = +n.attrs.n || 4
+        for (let i = 0; i < k; i++) {
+          const t = -((k - 1) / 2) * 20 + i * 20
+          { const cx = horiz ? n.x : n.x + t, cy = horiz ? n.y + t : n.y; o += body(circ(cx, cy, 7), [cx - 7, cy - 7, 14, 14]) }
+        }
+        break
+      }
+      case 'vector': {
+        const vals = n.label.split(',')
+        o = body(rr(L, T, n.w, n.h, 3))
+        const cell = (horiz ? n.h - 4 : n.w - 4) / vals.length
+        vals.forEach((v, i) => {
+          const c = -((vals.length - 1) / 2) * cell + i * cell
+          if (i) o += horiz ? s`<path d="M${L + 3},${n.y + c - cell / 2}h${n.w - 6}" stroke="${stroke}" stroke-opacity=".5"/>` : s`<path d="M${n.x + c - cell / 2},${T + 3}v${n.h - 6}" stroke="${stroke}" stroke-opacity=".5"/>`
+          o += text(v.trim(), horiz ? n.x : n.x + c, horiz ? n.y + c : n.y, FS - 1, 500, th.text)
+        })
+        break
+      }
+      case 'image':
+        o = s`<image href="${esc(n.attrs.src ?? '')}" x="${L}" y="${T}" width="${n.w}" height="${n.h}" preserveAspectRatio="xMidYMid slice"/>` +
+          `<path d="${rr(L, T, n.w, n.h, 2)}" fill="none" stroke="${stroke}"/>`
+        box(L, T, n.w, n.h)
+        break
+      default: {
+        const r = n.shape === 'thin' ? 5 : 7
+        o = body(rr(L, T, n.w, n.h, r), undefined, r) + label()
+      }
+    }
+    if (OUTSIDE.has(n.shape) && n.label) o += text(n.label, n.x, T - (ghosts * 5) - 11, FS - 1, 500, th.sub)
+    if (n.attrs.caption) o += text(n.attrs.caption, n.x, n.y + n.h / 2 + 12, FS - 1, 400, th.sub)
+    if (fx) {
+      const round = n.shape === 'op' || n.shape === 'var'
+      o += round ? badge(fx, n.x + n.w * 0.36, n.y - n.h * 0.36) : badge(fx, L + n.w - 2, T + 2)
+    }
+    return `<g>${o}</g>`
+  }
+  const d_rl = () => d.dir === 'RL', d_bt = () => d.dir === 'BT'
+
+  // --- edges
+  const drawEdge = (e: Edge) => {
+    const color = e.attrs.color ? pair(e.attrs.color)[1] : th.edge
+    if (e.fc) return fc(e, color)
+    const p = e.pts.map(q => [...q] as [number, number])
+    if (p.length < 2) return ''
+    const thick = e.op === '=>' || e.flags.has('thick')
+    const dashed = e.op.startsWith('..') || e.flags.has('dashed')
+    const heads = e.op === '--' || e.op === '..' ? 0 : e.op === '<->' ? 2 : 1
+    const AL = thick ? 9 : 7.5, AW = thick ? 4.2 : 3.4
+    let o = ''
+    const head = (tip: number[], from: number[]): [number, number] => {
+      const dx = tip[0] - from[0], dy = tip[1] - from[1], l = Math.hypot(dx, dy) || 1, ux = dx / l, uy = dy / l
+      const bx = tip[0] - ux * AL, by = tip[1] - uy * AL
+      o += `<path d="${poly(tip[0], tip[1], bx - uy * AW, by + ux * AW, tip[0] - ux * AL * 0.72, tip[1] - uy * AL * 0.72, bx + uy * AW, by - ux * AW)}" fill="${color}"/>`
+      return [tip[0] - ux * AL * 0.7, tip[1] - uy * AL * 0.7]
+    }
+    for (const q of p) box(q[0] - 2, q[1] - 2, 4, 4)
+    let d: string
+    if (e.curve) {
+      const [a, b, c, z] = p, k = e.curve
+      const c1 = [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k], c2 = [z[0] + (c[0] - z[0]) * k, z[1] + (c[1] - z[1]) * k]
+      const end = heads ? head(z, c2) : z, start = heads === 2 ? head(a, c1) : a
+      d = s`M${start[0]},${start[1]}C${c1[0]},${c1[1]} ${c2[0]},${c2[1]} ${end[0]},${end[1]}`
+    } else {
+      if (heads) p[p.length - 1] = head(p[p.length - 1], p[p.length - 2])
+      if (heads === 2) p[0] = head(p[0], p[1])
+      d = s`M${p[0][0]},${p[0][1]}`
+      for (let i = 1; i < p.length - 1; i++) {
+        const [a, b, c] = [p[i - 1], p[i], p[i + 1]]
+        const l1 = Math.hypot(b[0] - a[0], b[1] - a[1]), l2 = Math.hypot(c[0] - b[0], c[1] - b[1])
+        const r = Math.min(8, l1 / 2, l2 / 2)
+        d += s`L${b[0] + (a[0] - b[0]) * r / (l1 || 1)},${b[1] + (a[1] - b[1]) * r / (l1 || 1)}Q${b[0]},${b[1]} ${b[0] + (c[0] - b[0]) * r / (l2 || 1)},${b[1] + (c[1] - b[1]) * r / (l2 || 1)}`
+      }
+      d += s`L${p[p.length - 1][0]},${p[p.length - 1][1]}`
+    }
+    return s`<path d="${d}" fill="none" stroke="${color}" stroke-width="${thick ? 2.2 : 1.4}" stroke-linecap="round" stroke-linejoin="round"${dashed ? ' stroke-dasharray="5 4"' : ''}/>` + o
+  }
+  const centers = (n: Node) => {
+    const k = +n.attrs.n || 4
+    return Array.from({ length: k }, (_, i) => { const t = -((k - 1) / 2) * 20 + i * 20; return horiz ? [n.x, n.y + t] : [n.x + t, n.y] })
+  }
+  const fc = (e: Edge, color: string) => {
+    let d = ''
+    for (const [ax, ay] of centers(d_node(e.from))) for (const [bx, by] of centers(d_node(e.to))) {
+      const l = Math.hypot(bx - ax, by - ay), ux = (bx - ax) / l, uy = (by - ay) / l
+      d += s`M${ax + ux * 7},${ay + uy * 7}L${bx - ux * 7},${by - uy * 7}`
+    }
+    return `<path d="${d}" stroke="${color}" stroke-opacity=".45" stroke-width=".8"/>`
+  }
+  const d_node = (id: string) => d.nodes.get(id)!
+
+  // --- groups
+  const drawGroup = (g: Group) => {
+    if (!g.w) return ''
+    const { fill, stroke, fx } = g.flags.has('frozen') || g.flags.has('train') ? look(g) : { fill: g.attrs.color ? pair(g.attrs.color)[0] : th.group[0], stroke: g.attrs.color ? pair(g.attrs.color)[1] : th.group[1], fx: '' }
+    const dash = g.flags.has('dashed') ? ' stroke-dasharray="5 4"' : ''
+    const d = rr(g.x, g.y, g.w, g.h, 12)
+    let o = `<path d="${d}" fill="${fill}" stroke="${stroke}" stroke-width="1.2"${dash}/>`
+    const m = material(fx, d, g.x, g.y, g.w, g.h)
+    if (m) o += m + `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="1.2" stroke-opacity=".7"/>`
+    else if (fx === 'ice') o += `<path d="${d}" fill="url(#${P}frost)"/>` + snow(g.x, g.y, g.w, 12)
+    box(g.x, g.y, g.w, g.h)
+    if (g.label) o += text(g.label, g.x + 12, g.y + 13, FS - 2, 600, th.sub, 'start')
+    if (g.attrs.repeat) {
+      // put "N×" on the outer side of the diagram
+      const right = g.x + g.w / 2 > cx
+      o += text(g.attrs.repeat, right ? g.x + g.w + 10 : g.x - 10, g.y + g.h / 2, FS + 2, 500, th.text, right ? 'start' : 'end')
+    }
+    if (fx) o += badge(fx, g.x + g.w - 2, g.y + 2)
+    return o
+  }
+
+  const ns = [...d.nodes.values()]
+  const cx = ns.reduce((a, n) => a + n.x, 0) / (ns.length || 1)
+  const groups = d.groups.map(drawGroup).join('')
+  const edges = d.edges.map(drawEdge).join('')
+  const nodes = [...d.nodes.values()].map(drawNode).join('')
+  const labels = d.edges.filter(e => e.label && e.lx !== undefined)
+    .map(e => text(e.label!, e.lx!, e.ly!, FS - 1, 400, th.sub)).join('')
+  if (x0 === Infinity) x0 = y0 = x1 = y1 = 0
+  const m = 14, W = x1 - x0 + m * 2, H = y1 - y0 + m * 2
+  const bg = th.bg !== 'none' ? s`<rect x="${x0 - m}" y="${y0 - m}" width="${W}" height="${H}" rx="10" fill="${th.bg}"/>` : ''
+  return s`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0 - m} ${y0 - m} ${W} ${H}" width="${W}" height="${H}" font-family='${SANS}' style="max-width:100%;height:auto" role="img">` +
+    `<defs>${[...defs.values()].join('')}</defs>${bg}<g>${groups}</g><g>${edges}</g><g>${nodes}</g><g paint-order="stroke" stroke="${th.halo}" stroke-width="4" stroke-linejoin="round">${labels}</g></svg>`
+}

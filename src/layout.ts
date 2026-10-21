@@ -1,0 +1,288 @@
+import type { Diagram, Edge, Node } from './parse'
+import { layoutLabel } from './tex'
+
+// Layout = a grid. Main axis: rank (longest path). Cross axis: lane (a node inherits
+// its first predecessor's lane, so chains stay perfectly straight). Edges are
+// orthogonal: straight, one Z bend in the gap before the target, or a bracket
+// around obstacles. No splines, no force simulation.
+
+export const FS = 13
+export const OUTSIDE = new Set(['tensor', 'stack', 'image', 'neurons'])
+export const nums = (s: string | undefined, def: number[]) => (s ? s.split(',').map(Number) : def)
+const REL: Record<string, [number, number]> = { 'left-of': [-1, 0], 'right-of': [1, 0], above: [0, -1], below: [0, 1] }
+const GP = 14 // group padding
+
+type V = [number, number]
+type R = { u: number; v: number; hu: number; hv: number }
+
+function size(n: Node, horiz: boolean) {
+  const lb = layoutLabel(n.label, n.shape === 'thin' ? FS - 1 : FS, 500)
+  let w: number, h: number
+  switch (n.shape) {
+    case 'thin': w = Math.max(lb.w + 26, 64); h = lb.h + 9; break
+    case 'op': w = h = 22; break
+    case 'var': w = h = Math.max(42, lb.w + 18, lb.h + 16); break
+    case 'tensor': { const [W, H, D] = nums(n.attrs.size, [36, 64, 20]); w = W + D * 0.6; h = H + D * 0.6; break }
+    case 'stack': { const [W, H] = nums(n.attrs.size, [44, 60]); const k = +n.attrs.n || 4, o = +n.attrs.offset || 7; w = W + (k - 1) * o; h = H + (k - 1) * o; break }
+    case 'enc': case 'dec':
+      if (horiz) { w = lb.w + 40; h = Math.max(84, lb.h + 44) } else { w = Math.max(lb.w + 64, 120); h = Math.max(52, lb.h + 26) }
+      break
+    case 'neurons': { const c = (+n.attrs.n || 4) * 20 + 4; [w, h] = horiz ? [22, c] : [c, 22]; break }
+    case 'vector': {
+      const vals = n.label.split(',')
+      const cw = Math.max(36, ...vals.map(v => layoutLabel(v.trim(), FS - 1).w + 14))
+      ;[w, h] = horiz ? [cw, vals.length * 20 + 4] : [vals.length * cw + 4, 22]
+      break
+    }
+    case 'image': [w, h] = nums(n.attrs.size, [64, 64]); break
+    case 'text': w = lb.w + 8; h = lb.h + 4; break
+    default: w = Math.max(lb.w + 30, 76); h = lb.h + 18
+  }
+  n.w = +n.attrs.w || w
+  n.h = +n.attrs.h || h
+}
+
+export function layout(d: Diagram) {
+  const horiz = d.dir === 'LR' || d.dir === 'RL'
+  const [gapM, gapC] = d.gap ?? (horiz ? [56, 36] : [30, 44])
+  const nodes = [...d.nodes.values()]
+  for (const n of nodes) size(n, horiz)
+  const M = (n: Node) => (horiz ? n.w : n.h), C = (n: Node) => (horiz ? n.h : n.w)
+  const toS = (u: number, v: number): V => (d.dir === 'TB' ? [v, u] : d.dir === 'BT' ? [v, -u] : d.dir === 'LR' ? [u, v] : [-u, v])
+  const toA = (x: number, y: number): V => (d.dir === 'TB' ? [y, x] : d.dir === 'BT' ? [-y, x] : d.dir === 'LR' ? [x, y] : [-x, y])
+  const isFree = (n: Node) => 'at' in n.attrs || Object.keys(REL).some(k => k in n.attrs)
+  const laid = nodes.filter(n => !isFree(n))
+  const inGrid = new Set(laid.map(n => n.id))
+
+  // --- ranks: merge `rank a b` sets, drop DFS back edges, longest path
+  const rep = new Map(laid.map(n => [n.id, n.id]))
+  const find = (id: string) => { while (rep.get(id) !== id) id = rep.get(id)!; return id }
+  for (const set of d.ranks) for (const id of set.slice(1)) if (inGrid.has(id) && inGrid.has(set[0])) rep.set(find(id), find(set[0]))
+  const out = new Map<string, { to: string; e: Edge }[]>()
+  for (const e of d.edges) {
+    if (!inGrid.has(e.from) || !inGrid.has(e.to)) continue
+    const a = find(e.from), b = find(e.to)
+    if (a === b) continue
+    if (!out.has(a)) out.set(a, [])
+    out.get(a)!.push({ to: b, e })
+  }
+  const back = new Set<Edge>(), state = new Map<string, number>(), post: string[] = []
+  const dfs = (a: string) => {
+    state.set(a, 1)
+    for (const { to, e } of out.get(a) ?? []) {
+      const s = state.get(to)
+      if (s === 1) back.add(e)
+      else if (!s) dfs(to)
+    }
+    state.set(a, 2)
+    post.push(a)
+  }
+  for (const n of laid) if (!state.has(find(n.id))) dfs(find(n.id))
+  const rank = new Map<string, number>()
+  for (const a of post.reverse()) {
+    const ra = rank.get(a) ?? 0
+    rank.set(a, ra)
+    for (const { to, e } of out.get(a) ?? []) if (!back.has(e)) rank.set(to, Math.max(rank.get(to) ?? 0, ra + 1))
+  }
+  const rk = (n: Node) => rank.get(find(n.id))!
+
+  // --- lanes
+  const preds = new Map<string, Node[]>()
+  for (const e of d.edges)
+    if (inGrid.has(e.from) && inGrid.has(e.to) && !back.has(e) && !e.flags.has('skip')) {
+      if (!preds.has(e.to)) preds.set(e.to, [])
+      preds.get(e.to)!.push(d.nodes.get(e.from)!)
+    }
+  const lane = new Map<string, number>(), claimed = new Set<string>(), occ = new Set<string>()
+  let next = 0
+  for (const n of [...laid].sort((a, b) => rk(a) - rk(b) || a.order - b.order)) {
+    const r = rk(n), free = (l: number) => !occ.has(r + ':' + l)
+    let l: number | undefined = n.attrs.lane !== undefined ? +n.attrs.lane : n.attrs.align ? lane.get(n.attrs.align) : undefined
+    if (l === undefined) {
+      const ps = (preds.get(n.id) ?? []).filter(p => rk(p) < r)
+      const ls = ps.map(p => lane.get(p.id)!)
+      if (ps.length > 1 && ps.every(p => rk(p) === rk(ps[0])) && new Set(ls).size === ls.length) {
+        const m = ls.reduce((a, b) => a + b) / ls.length
+        if (free(m)) l = m
+      } else for (const p of ps) {
+        const pl = lane.get(p.id)!
+        if (!claimed.has(p.id) && free(pl)) { l = pl; claimed.add(p.id); break }
+      }
+    }
+    if (l === undefined || !free(l)) { while (!free(next)) next++; l = next }
+    next = Math.max(next, Math.floor(l) + 1)
+    occ.add(r + ':' + l)
+    lane.set(n.id, l)
+  }
+
+  // --- coordinates: lane/rank sizes, extra room where group membership changes
+  const nl = Math.max(0, ...[...lane.values()].map(Math.ceil)) + 1
+  const nr = Math.max(0, ...laid.map(rk)) + 1
+  const lw = Array(nl).fill(0), rs = Array(nr).fill(0)
+  const lg: Set<string>[] = Array.from({ length: nl }, () => new Set()), rg: Set<string>[] = Array.from({ length: nr }, () => new Set())
+  for (const n of laid) {
+    const l = lane.get(n.id)!, r = rk(n), sig = n.groups.join()
+    if (Number.isInteger(l)) { lw[l] = Math.max(lw[l], C(n)); lg[l].add(sig) }
+    rs[r] = Math.max(rs[r], M(n))
+    n.groups.forEach(g => rg[r].add(g))
+  }
+  const differ = (a: Set<string>, b: Set<string>) => a.size !== b.size || [...a].some(x => !b.has(x))
+  // labelled edges widen the gap they sit in
+  const need = Array(nr).fill(gapM)
+  for (const e of d.edges) {
+    const a = d.nodes.get(e.from)!, b = d.nodes.get(e.to)!
+    if (!e.label || !inGrid.has(a.id) || !inGrid.has(b.id) || rk(b) <= rk(a)) continue
+    const lb = layoutLabel(e.label, FS - 1)
+    need[rk(b)] = Math.max(need[rk(b)], horiz ? lb.w + 24 : lb.h + 16)
+  }
+  const lp = [lw[0] / 2], rp = [rs[0] / 2]
+  for (let i = 1; i < nl; i++) lp[i] = lp[i - 1] + lw[i - 1] / 2 + gapC + (differ(lg[i - 1], lg[i]) ? GP * 2 : 0) + lw[i] / 2
+  for (let i = 1; i < nr; i++) rp[i] = rp[i - 1] + rs[i - 1] / 2 + need[i] + (differ(rg[i - 1], rg[i]) ? GP * 1.5 : 0) + rs[i] / 2
+  const vOf = (l: number) => { const a = Math.floor(l), b = Math.ceil(l); return lp[a] + (lp[b] - lp[a]) * (l - a) }
+  const nudge = (n: Node) => { const [dx, dy] = nums(n.attrs.nudge, [0, 0]); n.x += dx; n.y += dy }
+  for (const n of laid) { [n.x, n.y] = toS(rp[rk(n)], vOf(lane.get(n.id)!)); nudge(n) }
+
+  // free nodes: at=x,y (screen px) or left-of/right-of/above/below=<id>
+  let pending = nodes.filter(isFree)
+  const placed = new Set(inGrid)
+  for (let pass = 0; pending.length && pass <= nodes.length; pass++)
+    pending = pending.filter(n => {
+      if (n.attrs.at) { [n.x, n.y] = nums(n.attrs.at, [0, 0]); nudge(n); placed.add(n.id); return false }
+      const k = Object.keys(REL).find(k => k in n.attrs)!
+      const t = d.nodes.get(n.attrs[k])
+      if (!t) throw new Error(`${n.id}: ${k} refers to unknown node "${n.attrs[k]}"`)
+      if (!placed.has(t.id)) return true
+      const [dx, dy] = REL[k], g = +n.attrs.dist || 22
+      n.x = t.x + dx * (t.w / 2 + n.w / 2 + g)
+      n.y = t.y + dy * (t.h / 2 + n.h / 2 + g)
+      nudge(n)
+      placed.add(n.id)
+      return false
+    })
+  if (pending.length) throw new Error(`circular placement: ${pending.map(n => n.id).join(', ')}`)
+
+  // --- routing (abstract coords: u along flow, v across)
+  const rc = new Map<string, R>()
+  for (const n of nodes) { const [u, v] = toA(n.x, n.y); rc.set(n.id, { u, v, hu: M(n) / 2, hv: C(n) / 2 }) }
+  const hit = (pts: V[], s: string, t: string) => {
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const [a, b] = [pts[i], pts[i + 1]]
+      const u0 = Math.min(a[0], b[0]), u1 = Math.max(a[0], b[0]), v0 = Math.min(a[1], b[1]), v1 = Math.max(a[1], b[1])
+      for (const [id, r] of rc)
+        if (id !== s && id !== t && u0 < r.u + r.hu + 3 && u1 > r.u - r.hu - 3 && v0 < r.v + r.hv + 3 && v1 > r.v - r.hv - 3) return true
+    }
+    return false
+  }
+  const chans: { side: number; a: number; b: number; v: number }[] = []
+  // first free line beside everything that sits in the corridor [lo, hi] over u ∈ (a, b)
+  const channel = (side: number, a: number, b: number, lo: number, hi: number) => {
+    let v = side > 0 ? hi : lo
+    for (let changed = true; changed;) {
+      changed = false
+      for (const r of rc.values())
+        if (r.u - r.hu < b && r.u + r.hu > a && r.v + r.hv > lo - 1 && r.v - r.hv < hi + 1) {
+          const edge = side > 0 ? r.v + r.hv : r.v - r.hv
+          if (side > 0 ? edge > v : edge < v) { v = edge; changed = true; side > 0 ? (hi = v) : (lo = v) }
+        }
+    }
+    v += side * 16
+    for (let again = true; again;) {
+      again = false
+      for (const c of chans) if (c.side === side && c.a < b && c.b > a && Math.abs(c.v - v) < 9) { v += side * 9; again = true }
+    }
+    chans.push({ side, a, b, v })
+    return v
+  }
+
+  type Plan = { e: Edge; S: R; T: R; ps: number; pt: number }
+  const direct: Plan[] = [], rest: Edge[] = []
+  for (const e of d.edges) {
+    const S = rc.get(e.from)!, T = rc.get(e.to)!
+    const a = d.nodes.get(e.from)!, b = d.nodes.get(e.to)!
+    if (e.op === '=>' && a.shape === 'neurons' && b.shape === 'neurons') { e.fc = true; continue }
+    if (e.from !== e.to && !e.flags.has('skip') && T.u - T.hu >= S.u + S.hu + 2) {
+      const lo = Math.max(S.v - S.hv, T.v - T.hv) + 6, hi = Math.min(S.v + S.hv, T.v + T.hv) - 6
+      const c = lo <= hi ? Math.min(hi, Math.max(lo, S.hv <= T.hv ? S.v : T.v)) : NaN
+      direct.push({ e, S, T, ps: isNaN(c) ? S.v : c, pt: isNaN(c) ? T.v : c })
+    } else rest.push(e)
+  }
+  // spread arrowheads that land on the same side of a node
+  const byT = new Map<string, Plan[]>()
+  for (const p of direct) { if (!byT.has(p.e.to)) byT.set(p.e.to, []); byT.get(p.e.to)!.push(p) }
+  for (const ps of byT.values()) {
+    if (ps.length < 2) continue
+    ps.sort((a, b) => a.pt - b.pt || a.S.v - b.S.v)
+    for (let i = 1; i < ps.length; i++) ps[i].pt = Math.max(ps[i].pt, ps[i - 1].pt + 12)
+    const T = ps[0].T, over = ps[ps.length - 1].pt - (T.v + T.hv - 5)
+    if (over > 0) for (const p of ps) p.pt -= over
+    for (const p of ps) if (Math.abs(p.pt - p.S.v) < p.S.hv - 4) p.ps = p.pt
+  }
+  const fin = (e: Edge, pts: V[], curve = 0) => {
+    e.pts = pts.map(([u, v]) => toS(u, v))
+    if (e.flags.has('curve') && pts.length === 4) e.curve = curve
+  }
+  for (const { e, S, T, ps, pt } of direct) {
+    const s0 = S.u + S.hu, t0 = T.u - T.hu, mid = (s0 + t0) / 2
+    const Z = (b: number): V[] => [[s0, ps], [b, ps], [b, pt], [t0, pt]]
+    const cands: V[][] = Math.abs(ps - pt) < 0.5 ? [[[s0, pt], [t0, pt]]] : [Z(Math.max(mid, t0 - gapM / 2)), Z(Math.min(mid, s0 + gapM / 2))]
+    const ok = cands.find(c => !hit(c, e.from, e.to))
+    if (ok) fin(e, ok, 1)
+    else rest.push(e)
+  }
+  for (const e of rest) {
+    const S = rc.get(e.from)!, T = rc.get(e.to)!
+    const side = /^(left|top|-)/.test(e.attrs.side ?? '') ? -1 : 1
+    const lo = Math.min(S.v - S.hv, T.v - T.hv), hi = Math.max(S.v + S.hv, T.v + T.hv)
+    if (e.from === e.to) {
+      const v = S.v + side * (S.hv + 18)
+      fin(e, [[S.u + S.hu * 0.4, S.v + side * S.hv], [S.u + S.hu * 0.4, v], [S.u - S.hu * 0.4, v], [S.u - S.hu * 0.4, S.v + side * S.hv]], 1.33)
+    } else if (!e.flags.has('skip') && S.u - S.hu < T.u + T.hu && T.u - T.hu < S.u + S.hu) {
+      // side by side: straight across
+      const u = (Math.max(S.u - S.hu, T.u - T.hu) + Math.min(S.u + S.hu, T.u + T.hu)) / 2, k = T.v > S.v ? 1 : -1
+      fin(e, [[u, S.v + k * S.hv], [u, T.v - k * T.hv]])
+    } else if (T.u > S.u) {
+      // forward but blocked (residual / skip): leave the out side, run beside the corridor, enter T's side
+      const s0 = S.u + S.hu, g = Math.min(gapM / 2, (T.u - T.hu - s0) / 2)
+      const v = channel(side, s0 + g, T.u + T.hu, lo, hi)
+      fin(e, [[s0, S.v], [s0 + g, S.v], [s0 + g, v], [T.u, v], [T.u, T.v + side * T.hv]])
+    } else {
+      // backward: U around the side
+      const v = channel(side, Math.min(S.u - S.hu, T.u - T.hu), Math.max(S.u + S.hu, T.u + T.hu), lo, hi)
+      fin(e, [[S.u, S.v + side * S.hv], [S.u, v], [T.u, v], [T.u, T.v + side * T.hv]], 1.33)
+    }
+  }
+
+  // --- edge labels: beside the longest segment, outside of U turns
+  for (const e of d.edges) {
+    if (!e.label || e.pts.length < 2) continue
+    const lb = layoutLabel(e.label, FS - 1)
+    let best = 0, bi = 0
+    for (let i = 0; i + 1 < e.pts.length; i++) {
+      const L = Math.hypot(e.pts[i + 1][0] - e.pts[i][0], e.pts[i + 1][1] - e.pts[i][1])
+      if (L > best) { best = L; bi = i }
+    }
+    const [a, b] = [e.pts[bi], e.pts[bi + 1]], f = e.pts[0], l = e.pts[e.pts.length - 1]
+    const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2
+    if (Math.abs(a[1] - b[1]) < Math.abs(a[0] - b[0])) {
+      const below = my > Math.max(f[1], l[1]) + 1
+      e.lx = mx; e.ly = my + (below ? 1 : -1) * (lb.h / 2 + 5)
+    } else {
+      const left = mx < Math.min(f[0], l[0]) - 1
+      e.lx = mx + (left ? -1 : 1) * (lb.w / 2 + 7); e.ly = my
+    }
+  }
+
+  // --- groups: members + their internal edges, children before parents
+  for (const g of [...d.groups].reverse()) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
+    const add = (x: number, y: number) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y) }
+    const mem = new Set(nodes.filter(n => n.groups.includes(g.id)).map(n => n.id))
+    for (const id of mem) { const n = d.nodes.get(id)!; add(n.x - n.w / 2, n.y - n.h / 2); add(n.x + n.w / 2, n.y + n.h / 2) }
+    for (const e of d.edges) if (mem.has(e.from) && mem.has(e.to)) for (const [x, y] of e.pts) add(x, y)
+    for (const c of d.groups) if (c.parent === g.id && c.w) { add(c.x, c.y); add(c.x + c.w, c.y + c.h) }
+    if (x0 === Infinity) continue
+    const top = g.label ? 18 : 0
+    Object.assign(g, { x: x0 - GP, y: y0 - GP - top, w: x1 - x0 + GP * 2, h: y1 - y0 + GP * 2 + top })
+  }
+  return d
+}
