@@ -1,10 +1,17 @@
 # forwardfig
 
-Draw ML architecture figures in TypeScript, written the way you write the model. It has zero dependencies, is about 19 KB gzipped, and outputs SVG (it also works in Node).
+Draw ML architecture figures in TypeScript, written the way you write the model. Zero dependencies, about 19 KB gzipped, SVG out, in the browser or in Node.
 
-Docs: https://frinfo702.github.io/forwardfig/docs/
+- Docs: https://frinfo702.github.io/forwardfig/docs/
+- Demo (paper figure gallery and playground): https://frinfo702.github.io/forwardfig/demo/
 
-Demo (paper figure gallery and playground): https://frinfo702.github.io/forwardfig/demo/
+## Install
+
+```sh
+npm install forwardfig   # or: pnpm add / yarn add / bun add forwardfig, deno add npm:forwardfig
+```
+
+## Example
 
 ```ts
 import { Figure, Module, Tensor, mha, norm, ffn, text } from 'forwardfig'
@@ -26,139 +33,50 @@ text('$\\mathbf{h}$')(y)
 fig.mount('#figure')                        // or fig.svg() for a string
 ```
 
-## Model
+Layers are callables, modules have a `forward`, and a `Figure` draws whatever they produce. Calling the same layer twice reuses its node, so shared weights stay one block.
 
-| | Role | Analogy |
-|---|---|---|
-| `Layer` | One block (one node). Calling it as `layer(x, y)` draws edges into it and returns a Tensor. Calling the same layer again adds edges to the same node, so shared weights stay one block. | `nn.Linear` / `keras.layers.Dense` |
-| `Module` | A subclass that implements `forward()`. Instances are callable. Pass `label` / `repeat` / `box` to draw a group box. `repeatSide: 'auto' \| 'top' \| 'bottom' \| 'left' \| 'right'` sets where `repeat` (e.g. ×N) goes. `auto` (the default) picks the first spot that doesn't collide with blocks, edges, labels or other groups. | `nn.Module` |
-| `Tensor` | The value flowing between blocks. `x.edge('$r$')` and `x.edge({ dashed: true })` style the next edge it enters. | KerasTensor |
-| `Figure` | The drawing side: `input()` (a label, or a layer plus extra options), `edge()` (edges outside forward), `rank()`, `svg()` / `mount()`. | `plt.figure` |
+## What it draws
 
-There are two ways to write a figure. Use whichever suits the figure, or mix them.
-
-- **All in the figure**: `figure(fig => { ... })` or `figure({ flow: 'LR' }, fig => { ... })` builds everything in one place.
-- **By module**: define each `Module` alongside your model code, then call them in the figure.
-
-```ts
-// functional style
-const fig = new Figure({ flow: 'BT' })
-const x = fig.input('$\\mathbf{x}$')
-const W = block('Pretrained $W$').freeze()               // 🧊
-const A = thin('$A$').trainable(), B = thin('$B$').trainable()   // 🔥
-add(W(x), B(A(x).edge('$r$')))
-```
-
-## Layers
-
-All layers take `(label?, options?)` or `(options?)`; `image(src, …)` and `vector(values, …)` take their data first.
-
-- Basic: `block` `thin` `text` `empty` (empty space, for arrows from / into the void) `circle` `op('+' | '*' | '~')` `enc` `dec` `tensor({ size: [w,h,d] })` `stack({ n, size, offset })` `neurons({ n })` `vector(values, label?, options?)`
-- ML presets: `mha` `attention` `ffn` `mlp` `norm` `embed` `linear` `softmax` `matmul` `concat` `conv` `pool` `act` `dropout` `loss`
-- Functional: `add(...xs)` (⊕) and `mul(...xs)` (⊗) create a new node on each call.
-- Grids: `matrix({ rows, cols, cells, cellSize })` (2D) and `voxels({ rows, cols, depth, cells, cellSize })` (3D, the front, top and right faces as cells). `cells` is a 2D array or `(r, c) => cell` (`(r, c, d) => cell` for voxels, with d = 0 in front). A cell is a number in 0–1 (a shade of the block's colour), a colour string, or `{ value | color, texture, label, crossed }`. When `cells` is omitted, varied shades are used. Textures inside cells use the lightweight vector looks. `axes: { rows, cols, depth }` names the extent along each axis (TeX works). `cols` goes under the bottom edge, `rows` to the left and `depth` beside the receding edge; any that would sit on an arrow are moved off its line.
-- Magnify: `magnify({ patch: [col, row] | region: [x, y, w, h], lens: 'circle' | 'square' })(img)`. Enlarges part of the image it's called on with a magnifying glass (`circle`, the default) or an inset (`square`). `patch` is one cell of the source's `grid`, and `region` is a range given as 0–1 fractions. It draws the range's outline and zoom lines instead of an arrow, and the enlarged part can feed the next block (e.g. Linear Projection). The lens shows the source range cropped by default; `src` (URL, `<img>`, `<canvas>`, with `fit`) puts any other image in it, such as a high-resolution crop.
-- 3D:
-  - `gaussian({ peaks: [[x, y, amp?, sigma?]], mesh })`: a Gaussian or mixture surface.
-  - `space({ points: [[x, y, z, class?]], axes: { x, y, z } })`: a 3D scatter on axis panes.
-  - `sphere({ points })`: points on a hypersphere.
-  - `pointcloud({ points: [[x, y, z, class?]], shape: 'torus' | 'sphere' | 'cube', n })`: a point cloud. Closer points are drawn larger and darker. When `points` is omitted, they're sampled from `shape`.
-- Signals: `waveform({ samples })`. `samples` takes raw audio in [-1, 1] (`number[]` or `Float32Array`). Long signals are reduced to at most 256 min/max columns, so the SVG stays light. When omitted, a synthetic speech-like waveform is drawn.
-- Function plots: `plot(Math.sin, { x: [-Math.PI, Math.PI], y?, axes?, samples? })`. The graph of y = fn(x) with optional axes through the origin. `y` defaults to the sampled range, and NaN / ±Infinity break the curve. `points: [{ at: [[x, y], ...], marker: 'star', label }]` adds scatter series (circle, square, triangle, diamond, star, cross), and `legend: true` keys them.
-- Images: `image(src, label?, { size, fit: 'cover' | 'contain', grid, n, tilt, rotate })`. `src` can be a URL, a data URL, an `<img>` or a `<canvas>`. Passing an array (`image([t0, t1, t2])`) draws a stack of frames, each its own image, with the first one in front. `grid` draws a ViT-style patch grid, and `n` draws a batch of frames. `tilt` (degrees) turns the image around its vertical axis and draws it obliquely; a positive value sends the right edge back (up), a negative one the left; combined with `n`, it reads as a video volume. `rotate` (degrees) rotates it in-plane. The layout uses the transformed frame's bounding box.
-
-Common options: `color` `texture` `frozen` `trainable` `crossed` `dashed` `bold` `w` `h` `ghost` `caption` `id`
-
-- `color`: a palette name (`pink orange yellow green blue purple teal red gray white`) or `#hex`. If it's omitted, the block is a neutral grey that reads on both light and dark pages.
-- `crossed: true` dims the block and lays a red ✕ over it, for removed or ablated parts. On an edge it puts a ✕ in the middle, for a cut connection.
-- `texture` sets a block's surface. Set it on a module to style its group box.
-
-  | texture | Look | Example use |
-  |---|---|---|
-  | `ice` | Clear ice (WebGL) | Frozen weights. This is what `freeze()` gives |
-  | `magma` | Cracked magma (WebGL) | Trainable weights. This is what `trainable()` gives |
-  | `glass` | Frosted glass that keeps the block's colour (WebGL) | Soft prompts, adapters |
-  | `metal` | Brushed metal (WebGL) | Fixed ops, hardware |
-  | `noise` | Gaussian grain (WebGL) | Noise injection, diffusion |
-  | `quantized` | A 4-level mosaic of the block's colour (SVG) | Low-bit weights |
-  | `sparse` | A dot grid with gaps (SVG) | Pruning, sparsity |
-  | `hatch` | Diagonal lines (SVG) | Masked, stop-gradient |
-
-  When both are set, `texture` decides the surface, and the ❄/🔥 badge follows `freeze()` / `trainable()` (for example `block({ texture: 'quantized' }).freeze()` in QLoRA). Without WebGL, glass, metal and noise fall back to lightweight vector versions.
-
-- `new Figure({ legend: true })` adds a key under the figure for the looks it uses (❄ frozen, 🔥 trainable, each texture, ✕ crossed). `legend: { position: 'right', labels: { quantized: '4-bit' } }` moves it beside the figure and renames entries.
-- Placement is automatic by default. To override it, use `lane` (fractions allowed), `align: ref`, `leftOf` / `rightOf` / `above` / `below: ref` (with `dist`), `at: [x, y]` or `nudge: [dx, dy]`.
-- `freeze()` / `trainable()` can be called on a layer or on a module. On a module they apply to every block inside it, unless a layer is marked explicitly.
-- A 🧊 or 🔥 in a label works the same way.
-
-Edges (`x.edge({...})` / `fig.edge(a, b, {...})`): `label` `crossed` `join: 'side'` (comes down the source's line and turns into the target's side, an L; for conditioning taps. It doesn't affect column assignment) `dashed` `arrow: 'end' | 'both' | 'none'` `thick` `dense` (fully connected between `neurons`) `skip` `curve` `side` (where a detour runs: `left` / `right` in TB / BT, `top` / `bottom` in LR / RL) `color`
-
-Labels: a newline (`\n`) starts a new line, and `$...$` is TeX.
-
-- **When the page loads MathJax 3**, math is typeset by it automatically. It's embedded in the SVG as paths drawn with real TeX metrics and glyphs. Use `tex-svg-full.js`, because the other builds load some extensions asynchronously.
-
-  ```html
-  <script>window.MathJax = { startup: { typeset: false }, svg: { fontCache: 'local' } }</script>
-  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg-full.js"></script>
-  <script type="module">await MathJax.startup.promise; /* draw figures */</script>
-  ```
-
-- **In Node, or with any other engine**, pass a function that returns an `<svg viewBox>` (1000 units per em) via `configure({ tex: src => ... })`. With `mathjax-full`, `tex: t => adaptor.outerHTML(html.convert(t, { display: false }))` works.
-- **Without MathJax**, a built-in lightweight engine handles it. It covers `^ _ \mathbf \mathrm \text \boldsymbol \mathcal \mathbb`, Greek letters, common symbols, `\hat \tilde \bar \vec` and `\frac` (rendered as a/b), with TeX-like spacing. Force it with `configure({ tex: null })`.
-
-## Custom presets
-
-The built-in presets (`mha`, `norm` and so on) are just a shape plus a default label and colour. You can define your own the same way.
-
-```ts
-const rmsnorm = preset('thin', 'RMSNorm', 'yellow')
-const moe = preset('block', 'MoE', { color: 'orange', ghost: 3, kind: 'moe' })
-rmsnorm()(x)                       // default label and colour
-rmsnorm('Pre-Norm', { color: 'blue' })(x)  // override them
-```
-
-`kind` is the key that `kinds` (below) matches on. It defaults to the shape name.
-
-## Style config
-
-Like matplotlib's rcParams, you can set defaults globally and narrow them down by scope. A narrower scope always wins, so a value applies unless a lower level sets its own.
-
-```ts
-configure({ style: { fontSize: 14 }, kinds: { mha: { color: 'purple' } } })  // whole library
-new Figure({ style: { color: 'gray', fontFamily: 'Times New Roman, serif' } }) // this figure
-new Encoder({ style: { fontSize: 11, texture: 'glass' } })                  // blocks made inside this module
-block('x', { fontSize: 20 })                                                // the block itself wins
-configure(null)                                                             // reset
-```
-
-- Precedence, strongest first: the block's own options > inner Module > outer Module > Figure > `configure()` > the preset's defaults.
-- At each level, `kinds[kind]` (for one preset) beats `style` (for all blocks).
-- `style` can set `color` `texture` `fontSize` `fontFamily` `dashed` `bold`. At the Figure / `configure` level, `fontSize` also sizes edge labels, group titles and captions, and `fontFamily` (any CSS font family) sets the font of the whole figure, e.g. to match a paper's body text. Math (`$...$`) keeps its TeX font.
-- A `texture` set through style doesn't override `freeze()` / `trainable()` (ice and magma win). A texture set on the block itself does.
-- `configure` also takes `theme` `flow` `gap` `materials` `legend`.
+- **Blocks**: `block`, `thin`, `op('+')`, `enc` / `dec`, tensors, stacks, neurons, and ML presets (`mha`, `ffn`, `norm`, `conv`, `loss`, ...). Define your own with `preset()`.
+- **Data**: images (patch grids, batches, tilted frames), `matrix` / `voxels` grids, `magnify` lenses, waveforms, function plots with scatter points, Gaussians, 3D scatters and point clouds.
+- **Looks**: `freeze()` renders ice, `trainable()` renders magma, plus glass, metal, noise, quantized, sparse and hatch textures. `crossed` marks removed parts, and `legend: true` adds a key.
+- **Labels**: `$...$` is TeX, typeset by MathJax when the page loads it, otherwise by a built-in subset.
+- **Layout**: automatic and straight-edged, with overrides (`lane`, `align`, `leftOf`, `at`, ...) when you need them.
+- **Styling**: matplotlib-like defaults by scope, from `configure()` down to a single block.
 
 ## Export
 
 ```ts
-await fig.download('figure.png')                 // the format follows the extension: .svg .png .jpg/.jpeg .webp
-await fig.download('figure.png', { scale: 3 })   // raster resolution
-const blob = await fig.toBlob({ format: 'webp', quality: 0.9, background: '#fff', theme: 'dark' })
-fig.svg()                                        // string (works in Node too)
+fig.svg()                                // string, works in Node
+await fig.download('figure.png')         // .svg .png .jpg .webp (raster needs a browser)
 ```
 
-- Raster formats (png / jpeg / webp) need a browser (canvas). External image URLs inside are inlined as data URLs before export. JPEG gets a white background by default.
-- PDF isn't supported. For papers, an SVG export (vector) can go into LaTeX via Inkscape or `svg2pdf`.
+From the command line, `npx forwardfig model.ts -o fig.svg` writes the module's default export. PNG / JPEG / WebP need the optional peer dependency `sharp`.
 
-From the command line (e.g. in a Makefile), `npx forwardfig model.ts -o fig.svg` writes the module's default export (a `Figure`, or a function returning one). The format follows the extension: `.svg`, or `.png` / `.jpg` / `.jpeg` / `.webp`, which need the optional peer dependency `sharp` (`npm i -D sharp`) and take `--scale` (default 2) and `--background`. Without a default export, each exported `Figure` becomes `<name>.svg` in the `-o` directory. `--theme dark` picks the theme. `.ts` files need Node ≥ 22.6 (`NODE_OPTIONS=--experimental-strip-types` before 23.6) or Bun.
+## Docs
 
-## Drawing core
+[Getting started](https://frinfo702.github.io/forwardfig/docs/getting-started/) ·
+[Concepts](https://frinfo702.github.io/forwardfig/docs/concepts/) ·
+[Blocks](https://frinfo702.github.io/forwardfig/docs/blocks/) ·
+[Images and data](https://frinfo702.github.io/forwardfig/docs/images-and-data/) ·
+[Styling](https://frinfo702.github.io/forwardfig/docs/styling/) ·
+[Layout and edges](https://frinfo702.github.io/forwardfig/docs/layout/) ·
+[Math labels](https://frinfo702.github.io/forwardfig/docs/math/) ·
+[Export](https://frinfo702.github.io/forwardfig/docs/export/) ·
+[Drawing core](https://frinfo702.github.io/forwardfig/docs/drawing-core/) ·
+[API reference](https://frinfo702.github.io/forwardfig/docs/api/) ·
+[Changelog](https://frinfo702.github.io/forwardfig/docs/changelog/)
 
-The layout and rendering engine is independent of the API above. `fig.diagram()` returns plain `Diagram` data (nodes, edges, groups, ranks), which `draw(diagram, { theme })` turns into SVG. Anything that can generate a Diagram, from another language or as JSON, can reuse the same engine.
+## Development
 
-- Layout: a grid of ranks (longest path) and lanes (a block inherits its first input's lane), so chains are always straight. Edges against the flow (e.g. a column that goes back up, aligned with `fig.rank`) are drawn straight, as an L or as a Z when the path is clear. A block whose only inputs come against the flow inherits the lane of the block it feeds. Edges are orthogonal: straight, one Z bend, or a detour. When several arrows enter one block, the one that goes dead straight never moves, and on a small ⊕ the others join from the side.
-- Materials: 🧊 / 🔥 run the WebGL shaders from [portfolio](https://github.com/frinfo702/portfolio) once per block size and embed the result as an image. Without WebGL it falls back to a vector look, and `new Figure({ materials: false })` forces that fallback.
-- Text is measured with canvas `measureText` (cached). Without a DOM, a width-table approximation is used.
+```sh
+bun install && bun test && bun run build
+python3 -m http.server   # then open /demo/
+bun run docs:dev         # docs at http://localhost:4321
+```
 
-To develop locally: run `bun install && bun test && bun run build`, then `python3 -m http.server` and open `demo/`. `bun run docs:dev` builds the docs in `doc/` and serves them at http://localhost:4321. Pushing to `main` deploys the demo to GitHub Pages.
+Pushing to `main` deploys the demo and docs to GitHub Pages.
 
-Known limits: crossings are reduced by reordering lanes, not minimized (a greedy pass that stops at a local minimum, and never moves a `lane` you set). TeX is a subset.
+## License
+
+MIT
