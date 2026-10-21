@@ -26,6 +26,8 @@ jobs:
       - run: |
           mkdir site
           cp -r demo dist site/
+          # bust the browser cache (Pages serves max-age=600) on every deploy
+          sed -i "s|../dist/machine-mermaid.js|../dist/machine-mermaid.js?v=${GITHUB_SHA::7}|" site/demo/index.html
           echo '<!doctype html><meta http-equiv="refresh" content="0; url=demo/">' > site/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
