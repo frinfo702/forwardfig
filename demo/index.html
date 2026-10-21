@@ -309,7 +309,7 @@ fig.mount('#figure')</pre>
   "url": "https://arxiv.org/abs/2106.09685",
   "cite": "Hu et al., LoRA: Low-Rank Adaptation (2021)",
   "fig": "Fig. 1",
-  "src": "const fig = new Figure({ flow: 'BT' })\nconst x = fig.input('$\\\\mathbf{x}\\\\in\\\\mathbb{R}^d$')\n\nconst W = block('Pretrained Weights\\n$W\\\\in\\\\mathbb{R}^{d\\\\times d}$', { w: 170, h: 70 }).freeze()\nconst A = thin('$A=\\\\mathcal{N}(0,\\\\sigma^2)$').trainable()\nconst B = thin('$B=0$').trainable()\n\ntext('$\\\\mathbf{h}$')(add(W(x), B(A(x).edge('$r$'))))\nreturn fig"
+  "src": "const fig = new Figure({ flow: 'BT', legend: { position: 'right' } })\nconst x = fig.input('$\\\\mathbf{x}\\\\in\\\\mathbb{R}^d$')\n\nconst W = block('Pretrained Weights\\n$W\\\\in\\\\mathbb{R}^{d\\\\times d}$', { w: 170, h: 70 }).freeze()\nconst A = thin('$A=\\\\mathcal{N}(0,\\\\sigma^2)$').trainable()\nconst B = thin('$B=0$').trainable()\n\ntext('$\\\\mathbf{h}$')(add(W(x), B(A(x).edge('$r$'))))\nreturn fig"
  },
  {
   "t": "LLaVA",
@@ -317,7 +317,7 @@ fig.mount('#figure')</pre>
   "url": "https://arxiv.org/abs/2304.08485",
   "cite": "Liu et al., Visual Instruction Tuning (2023)",
   "fig": "Fig. 1, stage 1 (feature alignment)",
-  "src": "const fig = new Figure({ flow: 'BT' })\nconst tokens = (name, color) => vector([`$\\\\mathbf{${name[0]}}_\\\\text{${name[1]}}$`, '', '', ''], { color })\n\nconst img = fig.input(image(demoImage(), { size: [64, 48], caption: 'Image $\\\\mathbf{X}_\\\\text{v}$' }))\nconst instruction = fig.input('Language Instruction $\\\\mathbf{X}_\\\\text{q}$')\n\nconst Zv = tokens('Zv', 'gray')(enc('Vision Encoder', { w: 150 }).freeze()(img))\nconst Hv = tokens('Hv', 'orange')(thin('Projection $\\\\mathbf{W}$').trainable()(Zv))\nconst Hq = tokens('Hq', 'blue')(instruction)\nfig.rank(Hv, Hq)\n\nconst llm = block('Language Model $f_\\\\phi$', { w: 330, h: 56, lane: 0.5 }).freeze()\ntext('Language Response $\\\\mathbf{X}_\\\\text{a}$', { lane: 0.5 })(llm(Hv, Hq))\nreturn fig"
+  "src": "const fig = new Figure({ flow: 'BT', legend: true })\nconst tokens = (name, color) => vector([`$\\\\mathbf{${name[0]}}_\\\\text{${name[1]}}$`, '', '', ''], { color })\n\nconst img = fig.input(image(demoImage(), { size: [64, 48], caption: 'Image $\\\\mathbf{X}_\\\\text{v}$' }))\nconst instruction = fig.input('Language Instruction $\\\\mathbf{X}_\\\\text{q}$')\n\nconst Zv = tokens('Zv', 'gray')(enc('Vision Encoder', { w: 150 }).freeze()(img))\nconst Hv = tokens('Hv', 'orange')(thin('Projection $\\\\mathbf{W}$').trainable()(Zv))\nconst Hq = tokens('Hq', 'blue')(instruction)\nfig.rank(Hv, Hq)\n\nconst llm = block('Language Model $f_\\\\phi$', { w: 330, h: 56, lane: 0.5 }).freeze()\ntext('Language Response $\\\\mathbf{X}_\\\\text{a}$', { lane: 0.5 })(llm(Hv, Hq))\nreturn fig"
  },
  {
   "t": "QLoRA",
@@ -325,7 +325,7 @@ fig.mount('#figure')</pre>
   "url": "https://arxiv.org/abs/2305.14314",
   "cite": "Dettmers et al., QLoRA: Efficient Finetuning of Quantized LLMs (2023)",
   "fig": "Fig. 1",
-  "src": "const fig = new Figure({ flow: 'BT' })\nconst x = fig.input('$\\\\mathbf{X}^\\\\text{BF16}$')\n\n// frozen base weights stored in 4 bits: the texture says how, the badge says frozen\nconst W = block('4-bit NormalFloat\\n$\\\\mathbf{W}^\\\\text{NF4}$', { texture: 'quantized', color: 'blue', w: 170, h: 70 }).freeze()\nconst L1 = thin('$\\\\mathbf{L}_1$ BF16').trainable()\nconst L2 = thin('$\\\\mathbf{L}_2$ BF16').trainable()\n\ntext('$\\\\mathbf{Y}^\\\\text{BF16}$')(add(W(x), L2(L1(x).edge('$r$'))))\nreturn fig"
+  "src": "const fig = new Figure({ flow: 'BT', legend: true })\nconst x = fig.input('$\\\\mathbf{X}^\\\\text{BF16}$')\n\n// frozen base weights stored in 4 bits: the texture says how, the badge says frozen\nconst W = block('4-bit NormalFloat\\n$\\\\mathbf{W}^\\\\text{NF4}$', { texture: 'quantized', color: 'blue', w: 170, h: 70 }).freeze()\nconst L1 = thin('$\\\\mathbf{L}_1$ BF16').trainable()\nconst L2 = thin('$\\\\mathbf{L}_2$ BF16').trainable()\n\ntext('$\\\\mathbf{Y}^\\\\text{BF16}$')(add(W(x), L2(L1(x).edge('$r$'))))\nreturn fig"
  },
  {
   "t": "Prompt Tuning",
@@ -333,7 +333,7 @@ fig.mount('#figure')</pre>
   "url": "https://arxiv.org/abs/2104.08691",
   "cite": "Lester et al., The Power of Scale for Parameter-Efficient Prompt Tuning (2021)",
   "fig": "Fig. 2",
-  "src": "const fig = new Figure({ flow: 'BT' })\n// learned soft prompt (glass, trainable) in front of the frozen model's input\nconst prompt = fig.input(vector(['$P_1$', '$P_2$', '$P_3$'], { texture: 'glass', color: 'orange', trainable: true, caption: 'soft prompt' }))\nconst tokens = fig.input(vector(['$x_1$', '$x_2$', '$\\\\cdots$', '$x_n$'], { color: 'gray', caption: 'input tokens' }))\n\nconst model = block('Pre-trained Model (11B)', { w: 280, h: 56, lane: 0.5 }).freeze()\ntext('Output', { lane: 0.5 })(model(prompt, tokens))\nreturn fig"
+  "src": "const fig = new Figure({ flow: 'BT', legend: true })\n// learned soft prompt (glass, trainable) in front of the frozen model's input\nconst prompt = fig.input(vector(['$P_1$', '$P_2$', '$P_3$'], { texture: 'glass', color: 'orange', trainable: true, caption: 'soft prompt' }))\nconst tokens = fig.input(vector(['$x_1$', '$x_2$', '$\\\\cdots$', '$x_n$'], { color: 'gray', caption: 'input tokens' }))\n\nconst model = block('Pre-trained Model (11B)', { w: 280, h: 56, lane: 0.5 }).freeze()\ntext('Output', { lane: 0.5 })(model(prompt, tokens))\nreturn fig"
  },
  {
   "t": "PointNet",
