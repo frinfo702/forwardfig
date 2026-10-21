@@ -383,6 +383,30 @@ test('a column that flows back up stays straight; side taps join as an L', () =>
   expect(tap.pts[2][1]).toBeCloseTo(node('up2').y)               // into the side
 })
 
+test('edge labels avoid blocks, other edges and each other', () => {
+  for (const [flow, names] of [['TB', ['$\\alpha$ weight', '$\\beta$ weight', '$\\gamma$ weight']], ['LR', ['alpha', 'beta', 'gamma']]] as const) {
+    const fig = new Figure({ flow })
+    const x = fig.input('x')
+    for (const l of names) block('Expert')(x.edge(l))
+    const d = layout(fig.diagram())
+    type B = [number, number, number, number]
+    const hit = (a: B, b: B) => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1]
+    const labels = d.edges.map(e => { const t = layoutLabel(e.label!, 12); return [e.lx! - t.w / 2, e.ly! - t.h / 2, e.lx! + t.w / 2, e.ly! + t.h / 2] as B })
+    const blocks = [...d.nodes.values()].map(n => [n.x - n.w / 2, n.y - n.h / 2, n.x + n.w / 2, n.y + n.h / 2] as B)
+    labels.forEach((a, i) => {
+      for (const b of blocks) expect(hit(a, b)).toBe(false)
+      labels.forEach((b, j) => { if (i !== j) expect(hit(a, b)).toBe(false) })
+      d.edges.forEach((e, j) => {
+        if (i === j) return
+        for (let k = 0; k + 1 < e.pts.length; k++) {
+          const [p, q] = [e.pts[k], e.pts[k + 1]]
+          expect(hit(a, [Math.min(p[0], q[0]) - 2, Math.min(p[1], q[1]) - 2, Math.max(p[0], q[0]) + 2, Math.max(p[1], q[1]) + 2])).toBe(false)
+        }
+      })
+    })
+  }
+})
+
 test('colors: CSS names pass through, out-of-range shades clamp, class numbers wrap', () => {
   const svg = figure(fig => {
     const x = fig.input('x')

@@ -29,6 +29,8 @@ const GP = 14 // group padding
 
 type V = [number, number]
 type R = { u: number; v: number; hu: number; hv: number }
+export type Box = [number, number, number, number]
+export const hits = (a: Box, b: Box) => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1]
 
 function size(n: Node, horiz: boolean, base: number) {
   const fs = labelSize(n, base), lb = layoutLabel(n.label, fs, 500)
@@ -344,27 +346,6 @@ export function layout(d: Diagram) {
     }
   }
 
-  // --- edge labels: beside the longest segment, outside of U turns
-  for (const e of d.edges) {
-    if (!e.label || e.pts.length < 2) continue
-    const lb = layoutLabel(e.label, base - 1)
-    let best = 0, bi = 0
-    for (let i = 0; i + 1 < e.pts.length; i++) {
-      const L = Math.hypot(e.pts[i + 1][0] - e.pts[i][0], e.pts[i + 1][1] - e.pts[i][1])
-      if (L > best) { best = L; bi = i }
-    }
-    if (e.flags.has('join') && e.pts.length === 3) bi = 1 // an L into a side: label where it arrives
-    const [a, b] = [e.pts[bi], e.pts[bi + 1]], f = e.pts[0], l = e.pts[e.pts.length - 1]
-    const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2
-    if (Math.abs(a[1] - b[1]) < Math.abs(a[0] - b[0])) {
-      const below = my > Math.max(f[1], l[1]) + 1
-      e.lx = mx; e.ly = my + (below ? 1 : -1) * (lb.h / 2 + 5)
-    } else {
-      const left = mx < Math.min(f[0], l[0]) - 1
-      e.lx = mx + (left ? -1 : 1) * (lb.w / 2 + 7); e.ly = my
-    }
-  }
-
   // --- groups: members + their internal edges, children before parents
   for (const g of [...d.groups].reverse()) {
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
@@ -380,6 +361,52 @@ export function layout(d: Diagram) {
     if (x0 === Infinity) continue
     const top = g.label ? 18 : 0
     Object.assign(g, { x: x0, y: y0 - top, w: x1 - x0, h: y1 - y0 + top })
+  }
+
+  // --- edge labels: beside the longest segment, outside of U turns. Greedy: the first spot
+  // (that side, the other side, the other segments, then shifted along) that touches no
+  // block, group title, edge or earlier label; else the first spot.
+  // ponytail: labels placed earlier never move for later ones; reorder edges if a figure needs it
+  const bs: Box[] = []
+  for (const n of nodes) {
+    bs.push([n.x - n.w / 2, n.y - n.h / 2, n.x + n.w / 2, n.y + n.h / 2 + (n.attrs.caption ? 20 : 0)])
+    if (OUTSIDE.has(n.shape) && n.label) {
+      const t = layoutLabel(n.label, labelSize(n, base), 500), y = n.y - n.h / 2 - 11 - +(n.attrs.ghost ?? n.attrs.heads ?? 0) * 5
+      bs.push([n.x - t.w / 2, y - t.h / 2, n.x + t.w / 2, y + t.h / 2])
+    }
+  }
+  for (const g of d.groups) if (g.w && g.label) {
+    const t = layoutLabel(g.label, base - 2, 600)
+    bs.push([g.x + 12, g.y + 13 - t.h / 2, g.x + 12 + t.w, g.y + 13 + t.h / 2])
+  }
+  const segs = d.edges.flatMap(e => e.pts.slice(1).map((b, i): [Edge, number, Box] => {
+    const a = e.pts[i]
+    return [e, i, [Math.min(a[0], b[0]) - 2, Math.min(a[1], b[1]) - 2, Math.max(a[0], b[0]) + 2, Math.max(a[1], b[1]) + 2]]
+  }))
+  for (const e of d.edges) {
+    if (!e.label || e.pts.length < 2) continue
+    const lb = layoutLabel(e.label, base - 1), f = e.pts[0], l = e.pts[e.pts.length - 1]
+    const len = (i: number) => Math.hypot(e.pts[i + 1][0] - e.pts[i][0], e.pts[i + 1][1] - e.pts[i][1])
+    let bi = 0
+    for (let i = 1; i + 1 < e.pts.length; i++) if (len(i) > len(bi)) bi = i
+    if (e.flags.has('join') && e.pts.length === 3) bi = 1 // an L into a side: label where it arrives
+    // beside segment i at fraction t; k = 1 keeps it outside of U turns, -1 the other side
+    const at = (i: number, t: number, k: number): [number, number, number] => {
+      const [a, b] = [e.pts[i], e.pts[i + 1]], mx = a[0] + (b[0] - a[0]) * t, my = a[1] + (b[1] - a[1]) * t
+      if (Math.abs(a[1] - b[1]) < Math.abs(a[0] - b[0])) {
+        const below = (my > Math.max(f[1], l[1]) + 1 ? 1 : -1) * k
+        return [mx, my + below * (lb.h / 2 + 5), i]
+      }
+      const left = (mx < Math.min(f[0], l[0]) - 1 ? -1 : 1) * k
+      return [mx + left * (lb.w / 2 + 7), my, i]
+    }
+    const order = [bi, ...e.pts.slice(1).map((_, i) => i).filter(i => i !== bi && len(i) > 1).sort((a, b) => len(b) - len(a))]
+    const cands = [0.5, 0.25, 0.75].flatMap(t => order.flatMap(i => [at(i, t, 1), at(i, t, -1)]))
+    const area = ([x, y]: number[]): Box => [x - lb.w / 2, y - lb.h / 2, x + lb.w / 2, y + lb.h / 2]
+    const free = ([x, y, i]: number[]) => !bs.some(b => hits(area([x, y]), b)) && !segs.some(([o, j, b]) => !(o === e && j === i) && hits(area([x, y]), b))
+    const [x, y] = cands.find(free) ?? cands[0]
+    e.lx = x; e.ly = y
+    bs.push(area([x, y]))
   }
   return d
 }

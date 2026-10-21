@@ -1,5 +1,5 @@
 import type { Diagram, Edge, Group, Node } from './types'
-import { FS, OUTSIDE, imageMatrix, labelSize, nums, values } from './layout'
+import { FS, OUTSIDE, hits, imageMatrix, labelSize, nums, values, type Box } from './layout'
 import { bake, type Material } from './materials'
 import { SANS, SERIF, layoutLabel } from './tex'
 
@@ -669,8 +669,6 @@ export function render(d: Diagram, theme?: string, materials = true): string {
   // --- where a group's "N×" goes. A side is a candidate box next to the group; 'auto'
   // tries the outer side, below, the inner side, above (centered first, then the
   // left/right sides off-center) and takes the first box that touches nothing.
-  type Box = [number, number, number, number]
-  const hits = (a: Box, b: Box) => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1]
   const taken: Box[] = []
   const obstacles = (g: Group) => {
     const lineage = new Set<string>()
