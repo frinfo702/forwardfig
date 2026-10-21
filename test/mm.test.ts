@@ -41,3 +41,33 @@ test('render: svg out, errors carry line numbers', () => {
   expect(() => render('flow XY')).toThrow('line 1')
   expect(() => render('a -> ')).toThrow('line 1')
 })
+
+test('layout: a detouring edge does not shift the straight arrow into the same node', () => {
+  const d = layout(parse(`flow TB
+x text "x"
+c1 conv
+c2 conv
+add op "+"
+x -> c1 -> c2 -> add
+x -> add`))
+  const [, , c2add, skip] = d.edges
+  expect(skip.pts.length).toBe(5)
+  expect(c2add.pts.length).toBe(2)
+  expect(c2add.pts[0][0]).toBe(d.nodes.get('add')!.x)
+})
+
+test('layout: a side branch joins a small ⊕ from the side, the trunk stays straight', () => {
+  const d = layout(parse(`flow BT
+x text "x"
+W block "W"
+A thin "A"
+B thin "B"
+add op "+"
+x -> W -> add
+x -> A -> B -> add`))
+  const add = d.nodes.get('add')!
+  const wAdd = d.edges[1], bAdd = d.edges[4]
+  expect(wAdd.pts.every(p => p[0] === add.x)).toBe(true)
+  expect(bAdd.pts.length).toBe(3)
+  expect(bAdd.pts[2]).toEqual([add.x + add.w / 2, add.y])
+})

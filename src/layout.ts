@@ -194,7 +194,7 @@ export function layout(d: Diagram) {
     return v
   }
 
-  type Plan = { e: Edge; S: R; T: R; ps: number; pt: number }
+  type Plan = { e: Edge; S: R; T: R; ps: number; pt: number; alt?: V[] }
   const direct: Plan[] = [], rest: Edge[] = []
   for (const e of d.edges) {
     const S = rc.get(e.from)!, T = rc.get(e.to)!
@@ -206,28 +206,55 @@ export function layout(d: Diagram) {
       direct.push({ e, S, T, ps: isNaN(c) ? S.v : c, pt: isNaN(c) ? T.v : c })
     } else rest.push(e)
   }
+  const route = ({ e, S, T, ps, pt }: Plan) => {
+    const s0 = S.u + S.hu, t0 = T.u - T.hu, mid = (s0 + t0) / 2
+    const Z = (b: number): V[] => [[s0, ps], [b, ps], [b, pt], [t0, pt]]
+    const cands: V[][] = Math.abs(ps - pt) < 0.5 ? [[[s0, pt], [t0, pt]]] : [Z(Math.max(mid, t0 - gapM / 2)), Z(Math.min(mid, s0 + gapM / 2))]
+    return cands.find(c => !hit(c, e.from, e.to))
+  }
+  // edges that can't go direct even from their ideal ports detour, and must not
+  // push the arrowheads of the ones that can (keeps vertical arrows aligned)
+  const live = direct.filter(p => route(p) || (rest.push(p.e), false))
   // spread arrowheads that land on the same side of a node
   const byT = new Map<string, Plan[]>()
-  for (const p of direct) { if (!byT.has(p.e.to)) byT.set(p.e.to, []); byT.get(p.e.to)!.push(p) }
-  for (const ps of byT.values()) {
-    if (ps.length < 2) continue
-    ps.sort((a, b) => a.pt - b.pt || a.S.v - b.S.v)
-    for (let i = 1; i < ps.length; i++) ps[i].pt = Math.max(ps[i].pt, ps[i - 1].pt + 12)
-    const T = ps[0].T, over = ps[ps.length - 1].pt - (T.v + T.hv - 5)
-    if (over > 0) for (const p of ps) p.pt -= over
+  for (const p of live) { if (!byT.has(p.e.to)) byT.set(p.e.to, []); byT.get(p.e.to)!.push(p) }
+  // The straight edge closest to the center is the anchor and never moves; the
+  // others spread around it. If the node is too narrow for that, they enter
+  // from the side instead (L shape), as papers draw ⊕ joins.
+  const spread = (ps: Plan[], anchor: Plan | undefined, T: R) => {
+    const pt = ps.map(p => p.pt), a = anchor ? ps.indexOf(anchor) : 0
+    for (let i = a + 1; i < ps.length; i++) pt[i] = Math.max(pt[i], pt[i - 1] + 12)
+    for (let i = a - 1; i >= 0; i--) pt[i] = Math.min(pt[i], pt[i + 1] - 12)
+    const over = Math.max(0, pt[pt.length - 1] - (T.v + T.hv - 5)) - Math.max(0, T.v - T.hv + 5 - pt[0])
+    return { pt: pt.map(x => x - over), moved: over !== 0 }
+  }
+  for (const all of byT.values()) {
+    if (all.length < 2) continue
+    const T = all[0].T
+    all.sort((a, b) => a.pt - b.pt || a.S.v - b.S.v)
+    const anchor = all.filter(p => Math.abs(p.ps - p.pt) < 0.5).sort((a, b) => Math.abs(a.pt - T.v) - Math.abs(b.pt - T.v))[0]
+    let ps = all, r = spread(ps, anchor, T)
+    if (anchor && r.moved) {
+      ps = all.filter(p => {
+        if (p === anchor || Math.abs(p.S.v - T.v) <= T.hv) return true
+        const k = p.S.v > T.v ? 1 : -1, L: V[] = [[p.S.u + p.S.hu, p.S.v], [T.u, p.S.v], [T.u, T.v + k * T.hv]]
+        if (hit(L, p.e.from, p.e.to)) return true
+        p.alt = L
+        return false
+      })
+      r = spread(ps, anchor, T)
+    }
+    ps.forEach((p, i) => { p.pt = r.pt[i] })
     for (const p of ps) if (Math.abs(p.pt - p.S.v) < p.S.hv - 4) p.ps = p.pt
   }
   const fin = (e: Edge, pts: V[], curve = 0) => {
     e.pts = pts.map(([u, v]) => toS(u, v))
     if (e.flags.has('curve') && pts.length === 4) e.curve = curve
   }
-  for (const { e, S, T, ps, pt } of direct) {
-    const s0 = S.u + S.hu, t0 = T.u - T.hu, mid = (s0 + t0) / 2
-    const Z = (b: number): V[] => [[s0, ps], [b, ps], [b, pt], [t0, pt]]
-    const cands: V[][] = Math.abs(ps - pt) < 0.5 ? [[[s0, pt], [t0, pt]]] : [Z(Math.max(mid, t0 - gapM / 2)), Z(Math.min(mid, s0 + gapM / 2))]
-    const ok = cands.find(c => !hit(c, e.from, e.to))
-    if (ok) fin(e, ok, 1)
-    else rest.push(e)
+  for (const p of live) {
+    const ok = p.alt ?? route(p)
+    if (ok) fin(p.e, ok, 1)
+    else rest.push(p.e)
   }
   for (const e of rest) {
     const S = rc.get(e.from)!, T = rc.get(e.to)!
