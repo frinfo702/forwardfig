@@ -12,11 +12,14 @@
       "import": "./dist/forwardfig.js"
     }
   },
+  "bin": {
+    "forwardfig": "dist/cli.js"
+  },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "bun build src/index.ts --minify --outfile dist/forwardfig.js && bun build src/index.ts --minify --format=iife --outfile dist/forwardfig.iife.js && tsc --emitDeclarationOnly --declaration --outDir dist",
+    "build": "bun build src/index.ts --minify --outfile dist/forwardfig.js && bun build src/cli.ts --minify --target=node --external sharp --outfile dist/cli.js && bun build src/index.ts --minify --format=iife --outfile dist/forwardfig.iife.js && tsc --emitDeclarationOnly --declaration --outDir dist",
     "test": "bun test",
     "check": "tsc --noEmit",
     "docs:build": "bun doc/site/build.mjs",
@@ -24,8 +27,18 @@
     "prepublishOnly": "bun run check && bun test && bun run build"
   },
   "devDependencies": {
+    "@types/node": "^26.6.5",
     "marked": "^18.1.1",
+    "sharp": "^0.35.5",
     "typescript": "^5.6.0"
+  },
+  "peerDependencies": {
+    "sharp": ">=0.33"
+  },
+  "peerDependenciesMeta": {
+    "sharp": {
+      "optional": true
+    }
   },
   "license": "MIT",
   "repository": {
