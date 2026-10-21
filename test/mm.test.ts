@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { Figure, Module, Tensor, add, conv, ffn, figure, gaussian, image, mha, norm, op, space, sphere, text, thin, block, act, preset, configure, pointcloud, waveform, magnify, linear, matrix, voxels, vector, circle, empty, type Layer } from '../src/index'
+import { Figure, Module, Tensor, add, conv, ffn, figure, gaussian, image, mha, norm, op, space, sphere, text, thin, block, act, preset, configure, pointcloud, waveform, magnify, linear, matrix, voxels, vector, circle, empty, plot, type Layer } from '../src/index'
 import { layout } from '../src/layout'
 import { layoutLabel } from '../src/tex'
 
@@ -547,4 +547,15 @@ test('empty(): a zero-size point that draws nothing, so edges start or end in em
   const lone = new Figure()
   lone.input(empty())
   expect(lone.svg()).toContain('<g><g></g></g>')
+})
+
+test('plot(): samples fn over x, auto y range, breaks the curve at non-finite values', () => {
+  const p = plot(x => (x === 0 ? NaN : 1 / x), { x: [-1, 1], samples: 5 })
+  expect(p.options.y).toEqual([-2, 2]) // 1/x at x = ±0.5
+  const fig = new Figure()
+  fig.input(p)
+  const svg = fig.svg()
+  expect(svg).not.toContain('NaN')
+  const d = svg.match(/<path d="(M[^"]*)" fill="none" stroke="[^"]*" stroke-width="1.6"/)![1]
+  expect(d.match(/M/g)!.length).toBe(2) // two branches, split at x = 0
 })

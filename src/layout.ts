@@ -7,7 +7,7 @@ import { REGULAR, SANS, layoutLabel } from './tex'
 // around obstacles. No splines, no force simulation.
 
 export const FS = 13
-export const OUTSIDE = new Set(['tensor', 'stack', 'matrix', 'voxels', 'image', 'magnify', 'neurons', 'gaussian', 'space', 'sphere', 'pointcloud', 'waveform'])
+export const OUTSIDE = new Set(['tensor', 'stack', 'matrix', 'voxels', 'image', 'magnify', 'neurons', 'gaussian', 'space', 'sphere', 'pointcloud', 'waveform', 'plot'])
 export const values = (n: Node): string[] => JSON.parse(n.attrs.values ?? '[]')
 /** label size of a block: its own fontSize, else derived from the figure's base size */
 export const labelSize = (n: Node, base: number) =>
@@ -68,6 +68,7 @@ function size(n: Node, horiz: boolean, base: number, family: string) {
     case 'sphere': [w, h] = nums(n.attrs.size, [84, 84]); break
     case 'pointcloud': [w, h] = nums(n.attrs.size, [100, 84]); break
     case 'waveform': [w, h] = nums(n.attrs.size, [120, 44]); break
+    case 'plot': [w, h] = nums(n.attrs.size, [120, 84]); break
     case 'text': w = lb.w + 8; h = lb.h + 4; break
     case 'empty': w = h = 0; break
     default: w = Math.max(lb.w + 30, 76); h = lb.h + 18

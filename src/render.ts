@@ -529,6 +529,29 @@ export function render(d: Diagram, theme?: string, materials = true): string {
         o += `<path d="${path}" stroke="${stroke}" stroke-width="${f(Math.max(0.8, dx * 0.6))}" stroke-linecap="round"/>`
         break
       }
+      case 'plot': {
+        o = body(rr(L, T, n.w, n.h, 6))
+        const pad = 6, [x0, x1] = nums(n.attrs.x, [-1, 1]), [y0, y1] = nums(n.attrs.y, [-1, 1])
+        const X = (x: number) => L + pad + ((x - x0) / (x1 - x0 || 1)) * (n.w - 2 * pad)
+        const Y = (y: number) => y1 === y0 ? n.y : T + n.h - pad - ((y - y0) / (y1 - y0)) * (n.h - 2 * pad)
+        const ys = nums(n.attrs.ys, []), id = `${P}k${clips++}`
+        let path = '', pen = 'M', prev = NaN
+        ys.forEach((y, i) => {
+          // NaN / ±Infinity lift the pen, and so does a jump across the whole range (a pole, as in tan)
+          if (!Number.isFinite(y)) { pen = 'M'; prev = NaN; return }
+          if ((prev > y1 && y < y0) || (prev < y0 && y > y1)) pen = 'M'
+          path += s`${pen}${X(x0 + ((x1 - x0) * i) / (ys.length - 1))},${Y(y)}`
+          pen = 'L'; prev = y
+        })
+        if (n.attrs.axes !== 'false') {
+          const c = th.sub, ax = X(Math.min(Math.max(0, x0), x1)), ay = Y(Math.min(Math.max(0, y0), y1)), r = L + n.w - 3, t = T + 3
+          o += s`<path d="M${L + 3},${ay}H${r}M${ax},${T + n.h - 3}V${t}" stroke="${c}" stroke-width=".8"/>` +
+            s`<path d="M${r},${ay}l-5,-2.5v5zM${ax},${t}l-2.5,5h5z" fill="${c}"/>`
+        }
+        o += s`<clipPath id="${id}"><rect x="${L}" y="${T}" width="${n.w}" height="${n.h}"/></clipPath>` +
+          `<path d="${path}" fill="none" stroke="${pair(n.color)[1]}" stroke-width="1.6" stroke-linejoin="round" clip-path="url(#${id})"/>`
+        break
+      }
       case 'sphere': {
         const [c0, c1] = pair(n.color), R = Math.min(n.w, n.h) / 2 - 2, key = 'sph-' + tag(n.color)
         if (!defs.has(key)) defs.set(key, `<radialGradient id="${P}${key}" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="${th.dark ? mix(c0, c1, 0.35) : '#ffffff'}"/><stop offset=".55" stop-color="${c0}"/><stop offset="1" stop-color="${mix(c0, c1, 0.35)}"/></radialGradient>`)

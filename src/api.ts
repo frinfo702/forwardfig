@@ -136,6 +136,17 @@ export interface WaveformOptions extends NodeOptions {
   samples?: ArrayLike<number>
   size?: V2
 }
+export interface PlotOptions extends NodeOptions {
+  /** domain [min, max] (default [-1, 1]) */
+  x?: V2
+  /** range [min, max]; default: the sampled min and max */
+  y?: V2
+  /** x and y axes through the origin, or along the edge when 0 is out of range (default true) */
+  axes?: boolean
+  /** points sampled across the domain (default 100) */
+  samples?: number
+  size?: V2
+}
 export interface SphereOptions extends NodeOptions {
   /** directions [x, y, z, class?]; normalized onto the sphere */
   points?: number[][]
@@ -235,7 +246,7 @@ const graphOf = (xs: Tensor[], who: string) => {
 // --- layers
 
 export type Shape = 'block' | 'thin' | 'text' | 'circle' | 'op' | 'enc' | 'dec' | 'tensor' | 'stack' | 'neurons' | 'empty'
-  | 'vector' | 'matrix' | 'voxels' | 'image' | 'magnify' | 'gaussian' | 'space' | 'sphere' | 'pointcloud' | 'waveform'
+  | 'vector' | 'matrix' | 'voxels' | 'image' | 'magnify' | 'gaussian' | 'space' | 'sphere' | 'pointcloud' | 'waveform' | 'plot'
 
 export interface Layer<O extends NodeOptions = NodeOptions> {
   (...inputs: Tensor[]): Tensor
@@ -333,6 +344,16 @@ export function waveform(a?: string | WaveformOptions, b?: WaveformOptions): Lay
     })
   }
   return layer('waveform', label, { ...o, ...(wave && { wave }) } as WaveformOptions, 'waveform', { color: 'teal' })
+}
+
+/** The graph of y = fn(x), e.g. plot(Math.sin, { x: [-Math.PI, Math.PI] }). NaN / ±Infinity break the curve. */
+export function plot(fn: (x: number) => number, a?: string | PlotOptions, b?: PlotOptions): Layer<PlotOptions> {
+  const [label, { samples = 100, ...o }] = typeof a === 'string' ? [a, b ?? {}] : ['', a ?? {}]
+  const [x0, x1] = o.x ?? [-1, 1], k = Math.max(2, Math.round(samples))
+  const ys = Array.from({ length: k }, (_, i) => Math.round(fn(x0 + ((x1 - x0) * i) / (k - 1)) * 1e4) / 1e4)
+  const ok = ys.filter(Number.isFinite)
+  const y = o.y ?? (ok.length ? [Math.min(...ok), Math.max(...ok)] : [-1, 1])
+  return layer('plot', label, { ...o, x: [x0, x1], y, ys } as PlotOptions, 'plot', { color: 'blue' })
 }
 
 export type ImageSource = string | { currentSrc?: string; src?: string } | { toDataURL(type?: string): string }

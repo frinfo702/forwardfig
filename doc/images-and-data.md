@@ -88,5 +88,28 @@ gaussian('$p(\\mathbf{z})$', { peaks: [[-0.4, 0, 1, 0.35], [0.5, 0.3, 0.7, 0.3]]
 | `sphere` | `points: [[x, y, z, class?]]` | Directions, normalized onto a sphere. |
 | `pointcloud` | `points` or `shape: 'torus' \| 'sphere' \| 'cube'` | Nearer points are larger and darker; `n` points are sampled from `shape`. |
 | `waveform` | `samples: ArrayLike<number>` in [-1, 1] | Reduced to at most 256 min/max columns, so the SVG stays small. |
+| `plot` | `fn: (x) => number` | The graph of y = fn(x). See [Function plots](#function-plots). |
 
 Coordinates are in [-1, 1]. `class` is any number; it picks one of eight colors.
+
+## Function plots
+
+`plot(fn, label?, options?)` draws the graph of y = fn(x) in a box, so arrows connect to it like any other block.
+
+```ts figure
+import { Figure, plot, act } from 'forwardfig'
+
+const fig = new Figure({ flow: 'LR' })
+const x = fig.input(plot(Math.sin, '$\\sin x$', { x: [-Math.PI, Math.PI] }))
+plot(Math.tanh, '$\\tanh$', { x: [-3, 3], color: 'green' })(act('tanh')(x))
+```
+
+| Option | What it does |
+| --- | --- |
+| `x` | Domain `[min, max]` (default `[-1, 1]`). |
+| `y` | Range `[min, max]`. Taken from the samples when omitted; anything outside it is clipped. |
+| `axes` | x and y axes with arrows, through the origin, or along the edge when 0 is out of range (default `true`). |
+| `samples` | Points sampled across the domain (default 100). |
+| `size` | `[w, h]` in px (default `[120, 84]`). |
+
+NaN and ±Infinity break the curve, and so does a jump across the whole range (a pole, as in `tan`). There are no ticks, tick labels or grid.
