@@ -4,7 +4,7 @@
 export type Dir = 'TB' | 'BT' | 'LR' | 'RL'
 
 export interface Node {
-  // shape: block thin op circle text tensor stack enc dec neurons vector image gaussian space sphere
+  // shape: block thin op circle text tensor stack enc dec neurons vector image gaussian space sphere empty
   id: string; shape: string; label: string; color?: string
   flags: Set<string>; attrs: Record<string, string>; groups: string[]; order: number
   // filled by layout (screen coords, center)
