@@ -138,7 +138,7 @@ export class Graph {
       const parent = [...this.scope].reverse().map(p => this.groups.get(p)).find(Boolean)
       this.groups.set(m, {
         id: o.id ?? `g${this.groups.size}`, label: o.label ?? '', parent: parent?.id,
-        flags: new Set(o.dashed ? ['dashed'] : []), attrs: { ...(o.repeat && { repeat: o.repeat }), ...(o.color && { color: o.color }), ...(o.texture && { texture: o.texture }) },
+        flags: new Set(o.dashed ? ['dashed'] : []), attrs: { ...(o.repeat && { repeat: o.repeat }), ...(o.repeatSide && { 'repeat-side': o.repeatSide }), ...(o.color && { color: o.color }), ...(o.texture && { texture: o.texture }) },
         x: 0, y: 0, w: 0, h: 0,
       })
     }
@@ -286,6 +286,8 @@ export interface ModuleOptions extends StyleConfig {
   label?: string
   /** side note such as "N×" */
   repeat?: string
+  /** where `repeat` goes; 'auto' (default) takes the first side that collides with nothing */
+  repeatSide?: 'auto' | 'top' | 'bottom' | 'left' | 'right'
   /** draw a group box (default: when label or repeat is given) */
   box?: boolean
   color?: string

@@ -487,9 +487,8 @@ export function render(d: Diagram, theme?: string, materials = true): string {
     box(g.x, g.y, g.w, g.h)
     if (g.label) o += text(g.label, g.x + 12, g.y + 13, base - 2, 600, th.sub, 'start')
     if (g.attrs.repeat) {
-      // put "N×" on the outer side of the diagram
-      const right = g.x + g.w / 2 > cx
-      o += text(g.attrs.repeat, right ? g.x + g.w + 10 : g.x - 10, g.y + g.h / 2, base + 2, 500, th.text, right ? 'start' : 'end')
+      const [x, y, anchor] = repeatAt(g)
+      o += text(g.attrs.repeat, x, y, base + 2, 500, th.text, anchor)
     }
     o += badge(mark(g, fx), g.x + g.w - 2, g.y + 2)
     return o
@@ -497,6 +496,52 @@ export function render(d: Diagram, theme?: string, materials = true): string {
 
   const ns = [...d.nodes.values()]
   const cx = ns.reduce((a, n) => a + n.x, 0) / (ns.length || 1)
+
+  // --- where a group's "N×" goes. A side is a candidate box next to the group; 'auto'
+  // tries the outer side, below, the inner side, above (centered first, then the
+  // left/right sides off-center) and takes the first box that touches nothing.
+  type Box = [number, number, number, number]
+  const hits = (a: Box, b: Box) => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1]
+  const taken: Box[] = []
+  const obstacles = (g: Group) => {
+    const lineage = new Set<string>()
+    for (let p: Group | undefined = g; p; p = d.groups.find(q => q.id === p!.parent)) lineage.add(p.id)
+    const bs: Box[] = ns.map(n => [n.x - n.w / 2, n.y - n.h / 2, n.x + n.w / 2, n.y + n.h / 2 + (n.attrs.caption ? 20 : 0)])
+    for (const e of d.edges) {
+      for (let i = 0; i + 1 < e.pts.length; i++) {
+        const [a, b] = [e.pts[i], e.pts[i + 1]]
+        bs.push([Math.min(a[0], b[0]) - 2, Math.min(a[1], b[1]) - 2, Math.max(a[0], b[0]) + 2, Math.max(a[1], b[1]) + 2])
+      }
+      if (e.label && e.lx !== undefined) {
+        const t = layoutLabel(e.label, base - 1)
+        bs.push([e.lx - t.w / 2, e.ly! - t.h / 2, e.lx + t.w / 2, e.ly! + t.h / 2])
+      }
+    }
+    // other groups' boxes (not this one, its parents or its children)
+    for (const q of d.groups) if (q.w && !lineage.has(q.id) && q.parent !== g.id) bs.push([q.x, q.y, q.x + q.w, q.y + q.h])
+    return [...bs, ...taken]
+  }
+  const repeatAt = (g: Group): [number, number, 'start' | 'middle' | 'end'] => {
+    const t = layoutLabel(g.attrs.repeat, base + 2, 500), gap = 10
+    const at = {
+      left: (f = 0.5): [number, number, 'end'] => [g.x - gap, g.y + g.h * f, 'end'],
+      right: (f = 0.5): [number, number, 'start'] => [g.x + g.w + gap, g.y + g.h * f, 'start'],
+      top: (): [number, number, 'middle'] => [g.x + g.w / 2, g.y - gap - t.h / 2, 'middle'],
+      bottom: (): [number, number, 'middle'] => [g.x + g.w / 2, g.y + g.h + gap + t.h / 2, 'middle'],
+    }
+    const area = ([x, y, a]: [number, number, string]): Box =>
+      [a === 'end' ? x - t.w : a === 'middle' ? x - t.w / 2 : x, y - t.h / 2, a === 'start' ? x + t.w : a === 'middle' ? x + t.w / 2 : x, y + t.h / 2]
+    const outer = g.x + g.w / 2 > cx ? 'right' : 'left', inner = outer === 'right' ? 'left' : 'right'
+    const side = g.attrs['repeat-side'] as keyof typeof at | 'auto' | undefined
+    let pick = side && side !== 'auto' ? at[side]() : undefined
+    if (!pick) {
+      const cands = [at[outer](), at.bottom(), at[inner](), at.top(), ...[0.25, 0.75].flatMap(f => [at[outer](f), at[inner](f)])]
+      const bs = obstacles(g)
+      pick = cands.find(c => !bs.some(b => hits(area(c), b))) ?? cands[0]
+    }
+    taken.push(area(pick))
+    return pick
+  }
   const groups = d.groups.map(drawGroup).join('')
   const edges = d.edges.map(drawEdge).join('')
   const nodes = [...d.nodes.values()].map(drawNode).join('')

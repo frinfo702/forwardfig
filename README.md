@@ -29,7 +29,7 @@ fig.mount('#figure')                        // or fig.svg() for a string
 | | Role | Analogy |
 |---|---|---|
 | `Layer` | One block (one node). Calling it as `layer(x, y)` draws edges into it and returns a Tensor. Calling the same layer again adds edges to the same node, so shared weights stay one block. | `nn.Linear` / `keras.layers.Dense` |
-| `Module` | A subclass that implements `forward()`. Instances are callable. Pass `label` / `repeat` / `box` to draw a group box. | `nn.Module` |
+| `Module` | A subclass that implements `forward()`. Instances are callable. Pass `label` / `repeat` / `box` to draw a group box. `repeatSide: 'auto' \| 'top' \| 'bottom' \| 'left' \| 'right'` sets where `repeat` (e.g. ×N) goes. `auto` (the default) picks the first spot that doesn't collide with blocks, edges, labels or other groups. | `nn.Module` |
 | `Tensor` | The value flowing between blocks. `x.edge('$r$')` and `x.edge({ dashed: true })` style the next edge it enters. | KerasTensor |
 | `Figure` | The drawing side: `input()`, `edge()` (edges outside forward), `rank()`, `svg()` / `mount()`. | `plt.figure` |
 

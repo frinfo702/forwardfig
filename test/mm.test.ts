@@ -241,3 +241,30 @@ test('a TeX engine replaces the built-in math layout', () => {
   }
   expect(layoutLabel('a $\\theta$', 10).lines[0].some(r => r.math)).toBe(false)
 })
+
+test('repeatSide: explicit sides, and auto avoids what is in the way', () => {
+  class Body extends Module {
+    a = block('a')
+    forward(x: Tensor) { return this.a(x) }
+  }
+  const repeatXY = (svg: string) => {
+    const m = /<text[^>]*font-size="15"[^>]*>(<tspan x="([\d.-]+)" y="([\d.-]+)")/.exec(svg)!
+    return [+m[2], +m[3]]
+  }
+  const draw = (side?: 'top' | 'bottom' | 'left' | 'right' | 'auto') => {
+    const fig = new Figure({ flow: 'LR' })
+    // an input arrow runs into the group from the left, through the left-side spot
+    new Body({ repeat: '×N', repeatSide: side })(fig.input('x'))
+    const d = layout(fig.diagram())
+    return { svg: fig.svg(), g: d.groups[0] }
+  }
+  const { svg: bottom, g } = draw('bottom')
+  expect(repeatXY(bottom)[1]).toBeGreaterThan(g.y + g.h)
+  const [, topY] = repeatXY(draw('top').svg)
+  expect(topY).toBeLessThan(g.y)
+  const [leftX] = repeatXY(draw('left').svg)
+  expect(leftX).toBeLessThan(g.x)
+  // auto: the arrow from x enters on the left at mid-height, so auto must not sit there
+  const [ax, ay] = repeatXY(draw().svg)
+  expect(ax < g.x && Math.abs(ay - (g.y + g.h / 2)) < 8).toBe(false)
+})
