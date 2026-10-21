@@ -124,7 +124,7 @@ Like matplotlib's rcParams, you can set defaults globally and narrow them down b
 
 ```ts
 configure({ style: { fontSize: 14 }, kinds: { mha: { color: 'purple' } } })  // whole library
-new Figure({ style: { color: 'gray' } })                                    // this figure
+new Figure({ style: { color: 'gray', fontFamily: 'Times New Roman, serif' } }) // this figure
 new Encoder({ style: { fontSize: 11, texture: 'glass' } })                  // blocks made inside this module
 block('x', { fontSize: 20 })                                                // the block itself wins
 configure(null)                                                             // reset
@@ -132,7 +132,7 @@ configure(null)                                                             // r
 
 - Precedence, strongest first: the block's own options > inner Module > outer Module > Figure > `configure()` > the preset's defaults.
 - At each level, `kinds[kind]` (for one preset) beats `style` (for all blocks).
-- `style` can set `color` `texture` `fontSize` `dashed` `bold`. At the Figure / `configure` level, `fontSize` also sizes edge labels, group titles and captions.
+- `style` can set `color` `texture` `fontSize` `fontFamily` `dashed` `bold`. At the Figure / `configure` level, `fontSize` also sizes edge labels, group titles and captions, and `fontFamily` (any CSS font family) sets the font of the whole figure, e.g. to match a paper's body text. Math (`$...$`) keeps its TeX font.
 - A `texture` set through style doesn't override `freeze()` / `trainable()` (ice and magma win). A texture set on the block itself does.
 - `configure` also takes `theme` `flow` `gap` `materials` `legend`.
 

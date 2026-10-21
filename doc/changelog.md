@@ -20,6 +20,7 @@ A review pass over the TypeScript API. Four changes break existing code; the [mi
 
 ### Added
 
+- `style.fontFamily`: the figure's font (or one block's), with the same scoping as `fontSize`. Label widths are measured in it.
 - `figure(build)` without options.
 - `vector(values, label?, options?)` takes a label.
 - `fig.input(layer, options)` adds `options` to the layer (they were ignored).

@@ -227,6 +227,22 @@ test('fontSize changes block size and label size', () => {
   expect(figure({ style: { fontSize: 18 } }, fig => { block('a')(fig.input('x').edge('lbl')) }).svg()).toContain('font-size="17"')
 })
 
+test('fontFamily sets the svg font, measures labels in it and is escaped', () => {
+  const build = (o: object) => figure(o, fig => { block('Feed Forward')(fig.input('x')) })
+  const serif = build({ style: { fontFamily: 'Times New Roman, serif' } })
+  expect(serif.svg()).toContain('font-family="Times New Roman, serif"')
+  expect(build({ style: { fontFamily: '"Evil" <x>' } }).svg()).toContain('font-family="&quot;Evil&quot; &lt;x&gt;"')
+  try {
+    configure({ style: { fontFamily: 'Georgia' } })
+    expect(build({}).svg()).toContain('font-family="Georgia"')
+  } finally {
+    configure(null)
+  }
+  // the block's own font goes on its label and into the width cache key
+  expect(figure({}, fig => { block('a', { fontFamily: 'Courier' })(fig.input('x')) }).svg()).toContain('<text font-family="Courier"')
+  expect(layoutLabel('Feed Forward', 13, 500, 'Courier')).not.toBe(layoutLabel('Feed Forward', 13, 500))
+})
+
 test('tex spacing: math minus, space around relations and binary ops, none in scripts', () => {
   const [run] = layoutLabel('$x_{t-1}$', 13).lines
   expect(run.some(r => r.t.includes('−'))).toBe(true)

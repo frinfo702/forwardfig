@@ -397,6 +397,8 @@ export interface Style {
   texture?: Texture
   /** label size (px); at figure / configure level it also sizes edge, group and caption text */
   fontSize?: number
+  /** CSS font family; at figure / configure level it sets the whole figure's font */
+  fontFamily?: string
   dashed?: boolean
   bold?: boolean
 }
@@ -569,7 +571,7 @@ export class Figure {
       attrs: { ...(s.side && { side: s.side }), ...(s.color && { color: s.color }) },
     }))
     return {
-      dir: cfg.flow ?? 'TB', theme: cfg.theme ?? 'light', gap: cfg.gap, fontSize: cfg.style?.fontSize,
+      dir: cfg.flow ?? 'TB', theme: cfg.theme ?? 'light', gap: cfg.gap, fontSize: cfg.style?.fontSize, fontFamily: cfg.style?.fontFamily,
       legend: cfg.legend === true ? {} : cfg.legend || undefined,
       nodes, edges, groups: [...g.groups.values()].map(x => ({ ...x, flags: new Set(x.flags) })), ranks: g.ranks.map(rs => rs.map(r => g.id(r))),
     }
