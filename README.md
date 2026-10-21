@@ -148,6 +148,8 @@ fig.svg()                                        // string (works in Node too)
 - Raster formats (png / jpeg / webp) need a browser (canvas). External image URLs inside are inlined as data URLs before export. JPEG gets a white background by default.
 - PDF isn't supported. For papers, an SVG export (vector) can go into LaTeX via Inkscape or `svg2pdf`.
 
+From the command line (e.g. in a Makefile), `npx forwardfig model.ts -o fig.svg` writes the module's default export (a `Figure`, or a function returning one). The format follows the extension: `.svg`, or `.png` / `.jpg` / `.jpeg` / `.webp`, which need the optional peer dependency `sharp` (`npm i -D sharp`) and take `--scale` (default 2) and `--background`. Without a default export, each exported `Figure` becomes `<name>.svg` in the `-o` directory. `--theme dark` picks the theme. `.ts` files need Node ≥ 22.6 (`NODE_OPTIONS=--experimental-strip-types` before 23.6) or Bun.
+
 ## Drawing core
 
 The layout and rendering engine is independent of the API above. `fig.diagram()` returns plain `Diagram` data (nodes, edges, groups, ranks), which `draw(diagram, { theme })` turns into SVG. Anything that can generate a Diagram, from another language or as JSON, can reuse the same engine.
@@ -158,4 +160,4 @@ The layout and rendering engine is independent of the API above. `fig.diagram()`
 
 To develop locally: run `bun install && bun test && bun run build`, then `python3 -m http.server` and open `demo/`. `bun run docs:dev` builds the docs in `doc/` and serves them at http://localhost:4321. Pushing to `main` deploys the demo to GitHub Pages.
 
-Known limits: crossings are reduced by reordering lanes, not minimized (a greedy pass that stops at a local minimum, and never moves a `lane` you set). TeX is a subset. Edge labels are not checked for collisions.
+Known limits: crossings are reduced by reordering lanes, not minimized (a greedy pass that stops at a local minimum, and never moves a `lane` you set). TeX is a subset.

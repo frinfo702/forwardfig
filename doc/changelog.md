@@ -27,6 +27,7 @@ A review pass over the TypeScript API. Four changes break existing code; the [mi
 - `ModuleOptions` takes `frozen` and `trainable`.
 - `Layer.shape` is typed as `Shape`.
 - `FigureOptions.legend`: a key to the looks a figure uses (frozen, trainable, textures, crossed), under or beside it, with optional label overrides.
+- A `forwardfig <file> [-o out.svg] [--theme dark]` command that writes a module's figures as SVG, or as PNG / JPEG / WebP by the `-o` extension with the optional peer dependency `sharp` (`--scale`, `--background`), for Makefile / LaTeX workflows. See [Export](export.md#command-line).
 - Layout reorders lanes to reduce edge crossings. Whole columns swap, so chains stay straight; an explicit `lane` never moves, and groups stay contiguous. Figures without crossings are unchanged.
 
 ### Fixed
@@ -43,6 +44,7 @@ A review pass over the TypeScript API. Four changes break existing code; the [mi
 | A `"` in an image URL or a color broke out of the attribute | Attribute values are escaped; CSS colors stay out of SVG ids |
 | Changing what `configure()` returned changed the global config | It returns a copy |
 | An edge `color` that was a CSS color name was ignored | It is used as given |
+| Edge labels could sit on blocks, other edges or each other | A label takes the first free spot: the other side, another segment, or shifted along it |
 
 ### Migration
 

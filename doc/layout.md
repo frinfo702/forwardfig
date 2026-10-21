@@ -56,7 +56,8 @@ Style an edge with `x.edge({...})` before the call, or add one outside `forward`
 
 - When several arrows enter one block, the one that goes dead straight never moves; on a small ⊕ the others join from the side.
 - Edges against the flow are drawn straight, as an L, or as a Z when the way is clear; otherwise as a U around the side. A block fed only against the flow takes the lane of the block it feeds, so a column can run back up.
-- Lanes are reordered when that removes edge crossings: whole columns swap, so chains stay straight, and a lane you set with `lane` never moves. This is a greedy pass, so some crossings can remain. Edge labels are not checked for collisions.
+- Lanes are reordered when that removes edge crossings: whole columns swap, so chains stay straight, and a lane you set with `lane` never moves. This is a greedy pass, so some crossings can remain.
+- An edge label sits beside the edge's longest segment; if that spot touches a block, a group title, another edge or a label, it takes the first free one (the other side, another segment, or shifted along it).
 
 ```ts figure
 import { Figure, block, text } from 'forwardfig'
