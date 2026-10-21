@@ -14,7 +14,7 @@ type V2 = [number, number]
 export type Ref = Tensor | Layer<any>
 
 /**
- * Surface of a block. ice / magma are what freeze() / train() give; the rest are
+ * Surface of a block. ice / magma are what freeze() / trainable() give; the rest are
  * for whatever a figure wants to call out:
  * glass (soft prompts, adapters), metal (fixed ops, hardware), noise (noise
  * injection, diffusion), quantized (low-bit weights), sparse (pruned), hatch (masked).
@@ -28,8 +28,8 @@ export interface NodeOptions {
   /** 🧊 frozen weights (ice) */
   frozen?: boolean
   /** 🔥 trainable weights (magma) */
-  train?: boolean
-  /** surface texture; wins over frozen / train */
+  trainable?: boolean
+  /** surface texture; wins over frozen / trainable */
   texture?: Texture
   dashed?: boolean
   bold?: boolean
@@ -95,7 +95,7 @@ export interface MatrixOptions extends NodeOptions {
   /** per cell, as rows of cells or (row, col) => cell; default: varied shades */
   cells?: Cell[][] | ((r: number, c: number) => Cell)
   /** cell size (px, default 16) */
-  cell?: number
+  cellSize?: number
   /** names for the extent along each axis, e.g. { rows: '$T$', cols: '$d$' } */
   axes?: { rows?: string; cols?: string }
 }
@@ -105,7 +105,8 @@ export interface VoxelOptions extends NodeOptions {
   depth?: number
   /** per cell, (row, col, depth) => cell with depth 0 in front, or [row][col][depth]; default: varied shades */
   cells?: Cell[][][] | ((r: number, c: number, d: number) => Cell)
-  cell?: number
+  /** cell size (px, default 16) */
+  cellSize?: number
   /** names for the extent along each axis, e.g. { rows: 'H', cols: 'W', depth: 'C' } */
   axes?: { rows?: string; cols?: string; depth?: string }
 }
@@ -118,7 +119,8 @@ export interface GaussianOptions extends NodeOptions {
 export interface SpaceOptions extends NodeOptions {
   /** [x, y, z, class?] in [-1, 1]³ */
   points?: number[][]
-  axes?: [string, string, string]
+  /** axis names (default x, y, z) */
+  axes?: { x?: string; y?: string; z?: string }
   size?: V2
 }
 export interface PointCloudOptions extends NodeOptions {
@@ -150,6 +152,7 @@ export interface EdgeOptions {
   /** force the detour around blocks (residuals usually get it automatically) */
   skip?: boolean
   curve?: boolean
+  /** side a detour runs on: left / right in TB / BT, top / bottom in LR / RL */
   side?: 'left' | 'right' | 'top' | 'bottom'
   color?: string
   /** a ✕ on the edge: a cut connection */
@@ -171,12 +174,17 @@ export class Graph {
   ranks: Ref[][] = []
   ids = new Set<string>()
 
+  /** a user id must be unique; an auto id (prefix + counter) skips taken ones */
+  claim(id: string | undefined, prefix: string, i: number): string {
+    if (id === undefined) while (this.ids.has(id = `${prefix}${i}`)) i++
+    else if (this.ids.has(id)) throw new Error(`duplicate id "${id}"`)
+    this.ids.add(id)
+    return id
+  }
   node(L: Layer<any>): string {
     let r = this.nodes.get(L)
     if (!r) {
-      const id = L.options.id ?? `n${this.nodes.size}`
-      if (this.ids.has(id)) throw new Error(`duplicate id "${id}"`)
-      this.ids.add(id)
+      const id = this.claim(L.options.id, 'n', this.nodes.size)
       const groups = this.scope.map(m => this.groups.get(m)?.id).filter((g): g is string => !!g)
       r = { id, mods: [...this.scope], groups }
       this.nodes.set(L, r)
@@ -193,7 +201,7 @@ export class Graph {
     if ((o.box ?? !!(o.label || o.repeat)) && !this.groups.has(m)) {
       const parent = [...this.scope].reverse().map(p => this.groups.get(p)).find(Boolean)
       this.groups.set(m, {
-        id: o.id ?? `g${this.groups.size}`, label: o.label ?? '', parent: parent?.id,
+        id: this.claim(o.id, 'g', this.groups.size), label: o.label ?? '', parent: parent?.id,
         flags: new Set(o.dashed ? ['dashed'] : []), attrs: { ...(o.repeat && { repeat: o.repeat }), ...(o.repeatSide && { 'repeat-side': o.repeatSide }), ...(o.color && { color: o.color }), ...(o.texture && { texture: o.texture }) },
         x: 0, y: 0, w: 0, h: 0,
       })
@@ -231,7 +239,7 @@ export type Shape = 'block' | 'thin' | 'text' | 'circle' | 'op' | 'enc' | 'dec' 
 
 export interface Layer<O extends NodeOptions = NodeOptions> {
   (...inputs: Tensor[]): Tensor
-  readonly shape: string
+  readonly shape: Shape
   /** preset name, used to look up `kinds` in a style config (e.g. 'mha', 'norm', 'block') */
   readonly kind: string
   label: string
@@ -242,15 +250,15 @@ export interface Layer<O extends NodeOptions = NodeOptions> {
   /** mark as frozen (🧊) */
   freeze(): this
   /** mark as trainable (🔥) */
-  train(): this
+  trainable(): this
 }
 
-export function layer<O extends NodeOptions>(shape: string, label: string, options: O, kind = shape, defaults: NodeOptions = {}): Layer<O> {
+export function layer<O extends NodeOptions>(shape: Shape, label: string, options: O, kind: string = shape, defaults: NodeOptions = {}): Layer<O> {
   const L = ((...xs: Tensor[]) => graphOf(xs, `"${L.label}"`).apply(L, xs)) as Layer<O>
   return Object.assign(L, {
     shape, kind, label, options, defaults,
-    freeze() { L.options.frozen = true; L.options.train = false; return L },
-    train() { L.options.train = true; L.options.frozen = false; return L },
+    freeze() { L.options.frozen = true; L.options.trainable = false; return L },
+    trainable() { L.options.trainable = true; L.options.frozen = false; return L },
   })
 }
 
@@ -265,10 +273,9 @@ export type Factory<O extends NodeOptions = NodeOptions> = { (label?: string, op
  */
 export function preset<O extends NodeOptions = NodeOptions>(shape: Shape, label = '', defaults: string | (NodeOptions & { kind?: string }) = {}): Factory<O> {
   const { kind = shape, ...base } = typeof defaults === 'string' ? { color: defaults } : defaults
-  const s = shape === 'circle' ? 'var' : shape
   return ((a?: string | O, b?: O) => {
     const [l, o] = typeof a === 'string' ? [a, b ?? ({} as O)] : [label, a ?? ({} as O)]
-    return layer(s, l, { ...o }, kind, base)
+    return layer(shape, l, { ...o }, kind, base)
   }) as Factory<O>
 }
 
@@ -283,7 +290,10 @@ export const dec = preset('dec', 'Decoder', 'green')
 export const tensor = preset<TensorOptions>('tensor', '', 'blue')
 export const stack = preset<StackOptions>('stack', '', 'blue')
 export const neurons = preset<NeuronOptions>('neurons')
-export const vector = (values: string[], options: NodeOptions = {}) => layer('vector', '', { ...options, values })
+export function vector(values: string[], a?: string | NodeOptions, b?: NodeOptions): Layer<NodeOptions> {
+  const [label, o] = typeof a === 'string' ? [a, b ?? {}] : ['', a ?? {}]
+  return layer('vector', label, { ...o, values } as NodeOptions)
+}
 // ML presets
 export const mha = preset('block', 'Multi-Head Attention', { color: 'orange', kind: 'mha' })
 export const attention = preset('block', 'Attention', { color: 'orange', kind: 'attention' })
@@ -324,12 +334,11 @@ export function waveform(a?: string | WaveformOptions, b?: WaveformOptions): Lay
 }
 
 export type ImageSource = string | { currentSrc?: string; src?: string } | { toDataURL(type?: string): string }
-/** A real image: URL, data URL, <img> or <canvas>. */
+const href = (s: ImageSource) => typeof s === 'string' ? s : 'toDataURL' in s ? s.toDataURL('image/png') : s.currentSrc || s.src || ''
 /**
  * A real image: URL, data URL, <img> or <canvas>. An array draws a stack of
  * frames, the first one in front: image([t0, t1, t2], { tilt: 35 }).
  */
-const href = (s: ImageSource) => typeof s === 'string' ? s : 'toDataURL' in s ? s.toDataURL('image/png') : s.currentSrc || s.src || ''
 export function image(src: ImageSource | ImageSource[], a?: string | ImageOptions, b?: ImageOptions): Layer<ImageOptions> {
   const [label, o] = typeof a === 'string' ? [a, b ?? {}] : ['', a ?? {}]
   const srcs = Array.isArray(src) ? src.map(href) : [href(src)]
@@ -354,7 +363,7 @@ const cellData = (c: Cell | undefined, seed: number): CellData =>
 /** A grid of cells, each with its own shade, color, texture or label. */
 export function matrix(a?: string | MatrixOptions, b?: MatrixOptions): Layer<MatrixOptions> {
   const [label, { cells, ...o }] = typeof a === 'string' ? [a, b ?? {}] : ['', a ?? {}]
-  const rows = o.rows ?? (Array.isArray(cells) ? cells.length : 5), cols = o.cols ?? (Array.isArray(cells) ? Math.max(...cells.map(r => r.length)) : 5)
+  const rows = o.rows ?? (Array.isArray(cells) ? cells.length : 5), cols = o.cols ?? (Array.isArray(cells) ? Math.max(0, ...cells.map(r => r.length)) : 5)
   const at = (r: number, c: number) => (typeof cells === 'function' ? cells(r, c) : cells?.[r]?.[c])
   const grid = Array.from({ length: rows }, (_, r) => Array.from({ length: cols }, (_, c) => cellData(at(r, c), r * 31 + c)))
   return layer('matrix', label, { ...o, rows, cols, grid } as MatrixOptions, 'matrix', { color: 'blue' })
@@ -363,7 +372,9 @@ export function matrix(a?: string | MatrixOptions, b?: MatrixOptions): Layer<Mat
 /** A block of voxels seen from the front, top and right, each cell with its own look. */
 export function voxels(a?: string | VoxelOptions, b?: VoxelOptions): Layer<VoxelOptions> {
   const [label, { cells, ...o }] = typeof a === 'string' ? [a, b ?? {}] : ['', a ?? {}]
-  const rows = o.rows ?? 5, cols = o.cols ?? 5, depth = o.depth ?? 5
+  const arr = Array.isArray(cells) ? cells : undefined
+  const rows = o.rows ?? arr?.length ?? 5, cols = o.cols ?? (arr ? Math.max(0, ...arr.map(r => r.length)) : 5)
+  const depth = o.depth ?? (arr ? Math.max(0, ...arr.flatMap(r => r.map(c => c.length))) : 5)
   const at = (r: number, c: number, d: number) => cellData(typeof cells === 'function' ? cells(r, c, d) : cells?.[r]?.[c]?.[d], r * 97 + c * 31 + d * 7)
   const face = (n: number, m: number, f: (i: number, j: number) => CellData) => Array.from({ length: n }, (_, i) => Array.from({ length: m }, (_, j) => f(i, j)))
   const faces = {
@@ -411,6 +422,10 @@ export interface ModuleOptions extends StyleConfig {
   dashed?: boolean
   /** texture of the group box */
   texture?: Texture
+  /** 🧊 every block inside, like freeze() */
+  frozen?: boolean
+  /** 🔥 every block inside, like trainable() */
+  trainable?: boolean
 }
 
 export interface Module<O = Tensor> {
@@ -421,7 +436,7 @@ export interface Module<O = Tensor> {
  * `this.attn(x)` inside forward, `model(x)` in a figure.
  */
 export abstract class Module<O = Tensor> {
-  declare options: ModuleOptions & { frozen?: boolean; train?: boolean }
+  declare options: ModuleOptions
   constructor(options: ModuleOptions = {}) {
     const self = ((...xs: Tensor[]) => {
       const g = graphOf(xs, self.constructor.name || 'module')
@@ -437,9 +452,9 @@ export abstract class Module<O = Tensor> {
   }
   abstract forward(...inputs: Tensor[]): O
   /** freeze every block created inside (🧊), like requires_grad_(False) */
-  freeze(): this { this.options.frozen = true; this.options.train = false; return this }
+  freeze(): this { this.options.frozen = true; this.options.trainable = false; return this }
   /** mark every block created inside as trainable (🔥) */
-  train(): this { this.options.train = true; this.options.frozen = false; return this }
+  trainable(): this { this.options.trainable = true; this.options.frozen = false; return this }
 }
 
 // --- figure
@@ -471,7 +486,7 @@ export function configure(config: Config | null): FigureOptions {
   else if ('tex' in config) setTex(config.tex)
   const { tex: _, ...rest } = config ?? {}
   defaults = config === null ? {} : merge(defaults, rest)
-  return defaults
+  return structuredClone(defaults)
 }
 const merge = (a: FigureOptions, b: FigureOptions): FigureOptions => {
   const kinds = { ...a.kinds }
@@ -485,7 +500,7 @@ const cascade = (...layers: (object | undefined)[]) => {
   return out
 }
 
-const SKIP = new Set(['id', 'color', 'frozen', 'train', 'dashed', 'bold', 'crossed'])
+const SKIP = new Set(['id', 'color', 'frozen', 'trainable', 'dashed', 'bold', 'crossed'])
 const KEY: Record<string, string> = { leftOf: 'left-of', rightOf: 'right-of' }
 
 export class Figure {
@@ -493,8 +508,9 @@ export class Figure {
   private g = new Graph()
   constructor(options: FigureOptions = {}) { this.options = { ...options } }
 
-  /** A starting point: a text label, or any layer used as a source. */
+  /** A starting point: a text label, or any layer used as a source (options are added to it). */
   input(what: string | Layer<any> = '', options: NodeOptions = {}): Tensor {
+    if (typeof what !== 'string') Object.assign(what.options, options)
     const L = typeof what === 'string' ? text(what, options) : what
     return new Tensor(this.g, this.g.node(L))
   }
@@ -502,7 +518,7 @@ export class Figure {
   edge(from: Tensor, to: Ref, style: EdgeOptions | string = {}): this {
     if (from.graph !== this.g) throw new Error('edge: tensor belongs to another figure')
     if (!(to instanceof Tensor)) this.g.node(to)
-    this.g.edges.push({ from: from.node, to, style: typeof style === 'string' ? { label: style } : style })
+    this.g.edges.push({ from: from.node, to, style: { ...from.style, ...(typeof style === 'string' ? { label: style } : style) } })
     return this
   }
   /** Put blocks on the same rank (row in TB/BT, column in LR/RL). */
@@ -524,9 +540,9 @@ export class Figure {
         return true
       }
       const iced = strip('🧊'), fired = strip('🔥')
-      const inherited = [...r.mods].reverse().map(m => m.options).find(m => m.frozen || m.train)
-      const fx = own.frozen || iced ? 'frozen' : own.train || fired ? 'train' : inherited?.frozen ? 'frozen' : inherited?.train ? 'train' : ''
-      // a styled texture must not hide what freeze() / train() say; only the block's own texture may
+      const inherited = [...r.mods].reverse().map(m => m.options).find(m => m.frozen || m.trainable)
+      const fx = own.frozen || iced ? 'frozen' : own.trainable || fired ? 'train' : inherited?.frozen ? 'frozen' : inherited?.trainable ? 'train' : ''
+      // a styled texture must not hide what freeze() / trainable() say; only the block's own texture may
       if (fx && !own.texture) delete o.texture
       const flags = new Set([fx, o.dashed && 'dashed', o.bold && 'bold', o.crossed && 'crossed'].filter((f): f is string => !!f))
       const attrs: Record<string, string> = {}
@@ -626,8 +642,11 @@ async function rasterize(svg: string, o: ExportOptions, mime: string): Promise<B
   return new Promise((res, rej) => canvas.toBlob(b => (b ? res(b) : rej(new Error('export: canvas.toBlob failed'))), mime, o.quality ?? 0.92))
 }
 
-/** Build a figure in one block: figure({ flow: 'BT' }, fig => { ... }) */
-export function figure(options: FigureOptions, build: (fig: Figure) => unknown): Figure {
+/** Build a figure in one block: figure(fig => { ... }) or figure({ flow: 'BT' }, fig => { ... }) */
+export function figure(build: (fig: Figure) => unknown): Figure
+export function figure(options: FigureOptions, build: (fig: Figure) => unknown): Figure
+export function figure(a: FigureOptions | ((fig: Figure) => unknown), b?: (fig: Figure) => unknown): Figure {
+  const [options, build] = typeof a === 'function' ? [{}, a] : [a, b!]
   const f = new Figure(options)
   build(f)
   return f

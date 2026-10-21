@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { Figure, Module, Tensor, add, conv, ffn, figure, gaussian, image, mha, norm, op, space, sphere, text, thin, block, act, preset, configure, pointcloud, waveform, magnify, linear, matrix, voxels, type Layer } from '../src/index'
+import { Figure, Module, Tensor, add, conv, ffn, figure, gaussian, image, mha, norm, op, space, sphere, text, thin, block, act, preset, configure, pointcloud, waveform, magnify, linear, matrix, voxels, vector, circle, type Layer } from '../src/index'
 import { layout } from '../src/layout'
 import { layoutLabel } from '../src/tex'
 
@@ -30,7 +30,7 @@ test('Module: callable instance, group box, layers become nodes', () => {
 test('Module.freeze() freezes everything inside unless a layer says otherwise', () => {
   class M extends Module {
     a = block('a')
-    b = block('b').train()
+    b = block('b').trainable()
     forward(x: Tensor) { return this.b(this.a(x)) }
   }
   const fig = new Figure()
@@ -381,4 +381,70 @@ test('a column that flows back up stays straight; side taps join as an L', () =>
   const tap = e('mlp', 'up2')
   expect(tap.pts.length).toBe(3)                                // an L
   expect(tap.pts[2][1]).toBeCloseTo(node('up2').y)               // into the side
+})
+
+test('colors: CSS names pass through, out-of-range shades clamp, class numbers wrap', () => {
+  const svg = figure(fig => {
+    const x = fig.input('x')
+    block('A', { color: 'crimson', texture: 'quantized' })(x)
+    fig.input(voxels({ rows: 1, cols: 1, depth: 1, cells: () => 'rgb(1,2,3)' }))
+    fig.input(matrix({ cells: [[2, -1]] }))
+    fig.input(space({ points: [[0, 0, 0, -1], [0, 0, 0, 1.5]] }))
+    block('B')(x.edge({ color: 'crimson' }))
+  }).svg()
+  expect(svg).not.toContain('NaN')
+  expect(svg).not.toMatch(/#-|#[\da-f]{7}/)
+  expect(svg).toContain('stroke="crimson"')
+})
+
+test('quotes in URLs and colors cannot break out of attributes', () => {
+  const svg = figure(fig => {
+    image('a.png" onload="alert(1)')(fig.input('x'))
+    fig.input(block('A', { color: 'x" onclick="y' }))
+  }).svg()
+  expect(svg).not.toContain('onload="')
+  expect(svg).not.toContain('onclick="')
+})
+
+test('ids: auto ids skip user ids; nodes and groups share one namespace', () => {
+  class G extends Module { forward(x: Tensor) { return block('B')(x) } }
+  const d = figure(fig => { new G({ label: 'G' })(block('A')(fig.input('x', { id: 'n1' }))) }).diagram()
+  expect(new Set([...d.nodes.keys(), ...d.groups.map(g => g.id)]).size).toBe(d.nodes.size + d.groups.length)
+  expect(() => figure(fig => { new G({ label: 'G', id: 'n0' })(fig.input('x')) })).toThrow('duplicate id "n0"')
+})
+
+test('API: fig.edge keeps tensor style, input() adds options, grids infer size, configure() returns a copy', () => {
+  const fig = new Figure()
+  const x = fig.input('x'), B = block('B')
+  B(x)
+  fig.edge(x.edge({ dashed: true }), B)
+  expect(fig.diagram().edges[1].flags.has('dashed')).toBe(true)
+  const L = block('L')
+  fig.input(L, { below: B })
+  expect(L.options.below).toBe(B)
+  const v = voxels({ cells: [[[0.1, 0.2]], [[0.3]]] })
+  expect([v.options.rows, v.options.cols, v.options.depth]).toEqual([2, 1, 2])
+  expect(matrix({ cells: [] }).options.cols).toBe(0)
+  configure({ style: { color: 'red' } }).flow = 'LR'
+  expect(new Figure().diagram().dir).toBe('TB')
+  configure(null)
+})
+
+test('API: figure(fn), vector label, circle shape, cellSize, space axes, trainable()', () => {
+  const fig = figure(fig => {
+    vector(['a', 'b'], 'tokens', { color: 'blue' })(fig.input('x'))
+    fig.input(space({ axes: { z: 'depth' } }))
+    fig.input(matrix({ rows: 2, cols: 2, cellSize: 10 }))
+  })
+  const d = layout(fig.diagram())
+  const node = (s: string) => [...d.nodes.values()].find(n => n.shape === s)!
+  expect(node('vector').label).toBe('tokens')
+  expect([node('matrix').w, node('matrix').h]).toEqual([20, 20])
+  const svg = fig.svg()
+  for (const a of ['x', 'y', 'depth']) expect(svg).toContain(`>${a}</tspan>`)
+  expect(circle('z').shape).toBe('circle')
+  class M extends Module { b = block('b'); forward(x: Tensor) { return this.b(x) } }
+  const t = new Figure()
+  new M({ trainable: true })(t.input('x'))
+  expect([...t.diagram().nodes.values()][1].flags.has('train')).toBe(true)
 })

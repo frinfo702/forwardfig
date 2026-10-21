@@ -151,7 +151,7 @@ return fig</textarea>
 
   <section class="textures" aria-labelledby="tex-h">
     <div class="head"><h2 id="tex-h">Textures</h2></div>
-    <p class="lede">Set <code>texture</code> on any block, or on a module for its group box. <code>freeze()</code> and <code>train()</code> give ice and magma and add the badge; the other textures leave the badge to them. <code>crossed: true</code> strikes out a block, or an edge with <code>x.edge({ crossed: true })</code>.</p>
+    <p class="lede">Set <code>texture</code> on any block, or on a module for its group box. <code>freeze()</code> and <code>trainable()</code> give ice and magma and add the badge; the other textures leave the badge to them. <code>crossed: true</code> strikes out a block, or an edge with <code>x.edge({ crossed: true })</code>.</p>
     <ul class="swatches" id="swatches"></ul>
   </section>
 
@@ -277,7 +277,7 @@ fig.mount('#figure')</pre>
   "url": "https://arxiv.org/abs/1406.2661",
   "cite": "Goodfellow et al., Generative Adversarial Nets (2014)",
   "fig": "",
-  "src": "const fig = new Figure({ flow: 'LR' })\nconst G = block('Generator $G$').train()\nconst D = block('Discriminator $D$').train()\n\nconst fake = circle('$G(\\\\mathbf{z})$', { color: 'pink' })(G(fig.input('$\\\\mathbf{z}\\\\sim p_\\\\mathbf{z}$')))\nconst real = fig.input(image(demoImage(), { size: [40, 40], caption: '$\\\\mathbf{x}\\\\sim p_\\\\text{data}$' }))\ntext('real / fake')(D(fake, real))\nreturn fig"
+  "src": "const fig = new Figure({ flow: 'LR' })\nconst G = block('Generator $G$').trainable()\nconst D = block('Discriminator $D$').trainable()\n\nconst fake = circle('$G(\\\\mathbf{z})$', { color: 'pink' })(G(fig.input('$\\\\mathbf{z}\\\\sim p_\\\\mathbf{z}$')))\nconst real = fig.input(image(demoImage(), { size: [40, 40], caption: '$\\\\mathbf{x}\\\\sim p_\\\\text{data}$' }))\ntext('real / fake')(D(fake, real))\nreturn fig"
  },
  {
   "t": "Normalizing Flow",
@@ -285,7 +285,7 @@ fig.mount('#figure')</pre>
   "url": "https://arxiv.org/abs/1505.05770",
   "cite": "Rezende & Mohamed, Variational Inference with Normalizing Flows (2015)",
   "fig": "",
-  "src": "// two moons in 3D, colored by class (4th value)\nconst moons = Array.from({ length: 48 }, (_, i) => {\n  const t = (i % 24) / 23 * Math.PI, c = i < 24 ? 0 : 1, j = Math.sin(i * 12.9898) * 0.08\n  return c ? [0.6 - Math.cos(t) * 0.7, 0.4 - Math.sin(t) * 0.6 + j, j * 4, 1]\n           : [-0.4 + Math.cos(t) * 0.7, Math.sin(t) * 0.6 - 0.3 + j, -j * 4, 0]\n})\n\nconst fig = new Figure({ flow: 'LR' })\nconst data = fig.input(space('data space', { points: moons, size: [120, 108] }))\nconst flow = block('$f_\\\\theta$', { ghost: 3 }).train()\nconst z = gaussian('latent $p(\\\\mathbf{z})$', { peaks: [[0, 0, 1, 0.42]] })(flow(data))\nfig.edge(z, data, { label: '$f_\\\\theta^{-1}$', dashed: true, curve: true })\nreturn fig"
+  "src": "// two moons in 3D, colored by class (4th value)\nconst moons = Array.from({ length: 48 }, (_, i) => {\n  const t = (i % 24) / 23 * Math.PI, c = i < 24 ? 0 : 1, j = Math.sin(i * 12.9898) * 0.08\n  return c ? [0.6 - Math.cos(t) * 0.7, 0.4 - Math.sin(t) * 0.6 + j, j * 4, 1]\n           : [-0.4 + Math.cos(t) * 0.7, Math.sin(t) * 0.6 - 0.3 + j, -j * 4, 0]\n})\n\nconst fig = new Figure({ flow: 'LR' })\nconst data = fig.input(space('data space', { points: moons, size: [120, 108] }))\nconst flow = block('$f_\\\\theta$', { ghost: 3 }).trainable()\nconst z = gaussian('latent $p(\\\\mathbf{z})$', { peaks: [[0, 0, 1, 0.42]] })(flow(data))\nfig.edge(z, data, { label: '$f_\\\\theta^{-1}$', dashed: true, curve: true })\nreturn fig"
  },
  {
   "t": "CLIP",
@@ -301,7 +301,7 @@ fig.mount('#figure')</pre>
   "url": "https://arxiv.org/abs/2005.10242",
   "cite": "Wang & Isola, Alignment and Uniformity on the Hypersphere (2020)",
   "fig": "",
-  "src": "const fig = new Figure({ flow: 'LR' })\n// one encoder called on both views: shared weights, one block\nconst f = enc('Encoder $f$').train()\nconst view = noise => fig.input(image(demoImage(noise), { size: [44, 44] }))\nconst h = thin('normalize')(f(view(0), view(0.35)))\n\nconst points = Array.from({ length: 36 }, (_, i) => {\n  const c = i % 3, a = c * 2.1 + Math.sin(i * 7.1) * 0.25, b = 0.4 + Math.cos(i * 3.7) * 0.25\n  return [Math.cos(a) * Math.cos(b), Math.sin(a) * Math.cos(b), Math.sin(b) * (c - 1), c]\n})\nsphere('$\\\\mathbb{S}^{d-1}$', { points, size: [112, 112] })(h)\nreturn fig"
+  "src": "const fig = new Figure({ flow: 'LR' })\n// one encoder called on both views: shared weights, one block\nconst f = enc('Encoder $f$').trainable()\nconst view = noise => fig.input(image(demoImage(noise), { size: [44, 44] }))\nconst h = thin('normalize')(f(view(0), view(0.35)))\n\nconst points = Array.from({ length: 36 }, (_, i) => {\n  const c = i % 3, a = c * 2.1 + Math.sin(i * 7.1) * 0.25, b = 0.4 + Math.cos(i * 3.7) * 0.25\n  return [Math.cos(a) * Math.cos(b), Math.sin(a) * Math.cos(b), Math.sin(b) * (c - 1), c]\n})\nsphere('$\\\\mathbb{S}^{d-1}$', { points, size: [112, 112] })(h)\nreturn fig"
  },
  {
   "t": "LoRA",
@@ -309,7 +309,7 @@ fig.mount('#figure')</pre>
   "url": "https://arxiv.org/abs/2106.09685",
   "cite": "Hu et al., LoRA: Low-Rank Adaptation (2021)",
   "fig": "Fig. 1",
-  "src": "const fig = new Figure({ flow: 'BT' })\nconst x = fig.input('$\\\\mathbf{x}\\\\in\\\\mathbb{R}^d$')\n\nconst W = block('Pretrained Weights\\n$W\\\\in\\\\mathbb{R}^{d\\\\times d}$', { w: 170, h: 70 }).freeze()\nconst A = thin('$A=\\\\mathcal{N}(0,\\\\sigma^2)$').train()\nconst B = thin('$B=0$').train()\n\ntext('$\\\\mathbf{h}$')(add(W(x), B(A(x).edge('$r$'))))\nreturn fig"
+  "src": "const fig = new Figure({ flow: 'BT' })\nconst x = fig.input('$\\\\mathbf{x}\\\\in\\\\mathbb{R}^d$')\n\nconst W = block('Pretrained Weights\\n$W\\\\in\\\\mathbb{R}^{d\\\\times d}$', { w: 170, h: 70 }).freeze()\nconst A = thin('$A=\\\\mathcal{N}(0,\\\\sigma^2)$').trainable()\nconst B = thin('$B=0$').trainable()\n\ntext('$\\\\mathbf{h}$')(add(W(x), B(A(x).edge('$r$'))))\nreturn fig"
  },
  {
   "t": "LLaVA",
@@ -317,7 +317,7 @@ fig.mount('#figure')</pre>
   "url": "https://arxiv.org/abs/2304.08485",
   "cite": "Liu et al., Visual Instruction Tuning (2023)",
   "fig": "Fig. 1, stage 1 (feature alignment)",
-  "src": "const fig = new Figure({ flow: 'BT' })\nconst tokens = (name, color) => vector([`$\\\\mathbf{${name[0]}}_\\\\text{${name[1]}}$`, '', '', ''], { color })\n\nconst img = fig.input(image(demoImage(), { size: [64, 48], caption: 'Image $\\\\mathbf{X}_\\\\text{v}$' }))\nconst instruction = fig.input('Language Instruction $\\\\mathbf{X}_\\\\text{q}$')\n\nconst Zv = tokens('Zv', 'gray')(enc('Vision Encoder', { w: 150 }).freeze()(img))\nconst Hv = tokens('Hv', 'orange')(thin('Projection $\\\\mathbf{W}$').train()(Zv))\nconst Hq = tokens('Hq', 'blue')(instruction)\nfig.rank(Hv, Hq)\n\nconst llm = block('Language Model $f_\\\\phi$', { w: 330, h: 56, lane: 0.5 }).freeze()\ntext('Language Response $\\\\mathbf{X}_\\\\text{a}$', { lane: 0.5 })(llm(Hv, Hq))\nreturn fig"
+  "src": "const fig = new Figure({ flow: 'BT' })\nconst tokens = (name, color) => vector([`$\\\\mathbf{${name[0]}}_\\\\text{${name[1]}}$`, '', '', ''], { color })\n\nconst img = fig.input(image(demoImage(), { size: [64, 48], caption: 'Image $\\\\mathbf{X}_\\\\text{v}$' }))\nconst instruction = fig.input('Language Instruction $\\\\mathbf{X}_\\\\text{q}$')\n\nconst Zv = tokens('Zv', 'gray')(enc('Vision Encoder', { w: 150 }).freeze()(img))\nconst Hv = tokens('Hv', 'orange')(thin('Projection $\\\\mathbf{W}$').trainable()(Zv))\nconst Hq = tokens('Hq', 'blue')(instruction)\nfig.rank(Hv, Hq)\n\nconst llm = block('Language Model $f_\\\\phi$', { w: 330, h: 56, lane: 0.5 }).freeze()\ntext('Language Response $\\\\mathbf{X}_\\\\text{a}$', { lane: 0.5 })(llm(Hv, Hq))\nreturn fig"
  },
  {
   "t": "QLoRA",
@@ -325,7 +325,7 @@ fig.mount('#figure')</pre>
   "url": "https://arxiv.org/abs/2305.14314",
   "cite": "Dettmers et al., QLoRA: Efficient Finetuning of Quantized LLMs (2023)",
   "fig": "Fig. 1",
-  "src": "const fig = new Figure({ flow: 'BT' })\nconst x = fig.input('$\\\\mathbf{X}^\\\\text{BF16}$')\n\n// frozen base weights stored in 4 bits: the texture says how, the badge says frozen\nconst W = block('4-bit NormalFloat\\n$\\\\mathbf{W}^\\\\text{NF4}$', { texture: 'quantized', color: 'blue', w: 170, h: 70 }).freeze()\nconst L1 = thin('$\\\\mathbf{L}_1$ BF16').train()\nconst L2 = thin('$\\\\mathbf{L}_2$ BF16').train()\n\ntext('$\\\\mathbf{Y}^\\\\text{BF16}$')(add(W(x), L2(L1(x).edge('$r$'))))\nreturn fig"
+  "src": "const fig = new Figure({ flow: 'BT' })\nconst x = fig.input('$\\\\mathbf{X}^\\\\text{BF16}$')\n\n// frozen base weights stored in 4 bits: the texture says how, the badge says frozen\nconst W = block('4-bit NormalFloat\\n$\\\\mathbf{W}^\\\\text{NF4}$', { texture: 'quantized', color: 'blue', w: 170, h: 70 }).freeze()\nconst L1 = thin('$\\\\mathbf{L}_1$ BF16').trainable()\nconst L2 = thin('$\\\\mathbf{L}_2$ BF16').trainable()\n\ntext('$\\\\mathbf{Y}^\\\\text{BF16}$')(add(W(x), L2(L1(x).edge('$r$'))))\nreturn fig"
  },
  {
   "t": "Prompt Tuning",
@@ -333,7 +333,7 @@ fig.mount('#figure')</pre>
   "url": "https://arxiv.org/abs/2104.08691",
   "cite": "Lester et al., The Power of Scale for Parameter-Efficient Prompt Tuning (2021)",
   "fig": "Fig. 2",
-  "src": "const fig = new Figure({ flow: 'BT' })\n// learned soft prompt (glass, trainable) in front of the frozen model's input\nconst prompt = fig.input(vector(['$P_1$', '$P_2$', '$P_3$'], { texture: 'glass', color: 'orange', train: true, caption: 'soft prompt' }))\nconst tokens = fig.input(vector(['$x_1$', '$x_2$', '$\\\\cdots$', '$x_n$'], { color: 'gray', caption: 'input tokens' }))\n\nconst model = block('Pre-trained Model (11B)', { w: 280, h: 56, lane: 0.5 }).freeze()\ntext('Output', { lane: 0.5 })(model(prompt, tokens))\nreturn fig"
+  "src": "const fig = new Figure({ flow: 'BT' })\n// learned soft prompt (glass, trainable) in front of the frozen model's input\nconst prompt = fig.input(vector(['$P_1$', '$P_2$', '$P_3$'], { texture: 'glass', color: 'orange', trainable: true, caption: 'soft prompt' }))\nconst tokens = fig.input(vector(['$x_1$', '$x_2$', '$\\\\cdots$', '$x_n$'], { color: 'gray', caption: 'input tokens' }))\n\nconst model = block('Pre-trained Model (11B)', { w: 280, h: 56, lane: 0.5 }).freeze()\ntext('Output', { lane: 0.5 })(model(prompt, tokens))\nreturn fig"
  },
  {
   "t": "PointNet",
@@ -365,7 +365,7 @@ fig.mount('#figure')</pre>
   "url": "https://papers.nips.cc/paper/2012/hash/c399862d3b9d6b76c8436e924a68c45b-Abstract.html",
   "cite": "Krizhevsky et al., ImageNet Classification with Deep Convolutional Neural Networks (2012)",
   "fig": "Fig. 2",
-  "src": "const fig = new Figure({ flow: 'LR' })\n// feature volumes with their extents; cells are drawn, sizes are named\nconst volume = (h, c, rows, depth, color) =>\n  voxels({ rows, cols: rows, depth, cell: 10, color, axes: { rows: h, cols: h, depth: c } })\n\nlet x = fig.input(image(demoImage(), { size: [56, 56], caption: '224×224×3' }))\nx = volume('55', '96', 5, 3, 'blue')(x.edge('conv 11×11'))\nx = volume('27', '256', 4, 5, 'blue')(x.edge('conv 5×5'))\nx = volume('13', '384', 3, 7, 'teal')(x.edge('conv 3×3'))\nx = volume('13', '256', 3, 6, 'teal')(x.edge('conv 3×3'))\nconst dense = matrix({ rows: 6, cols: 1, cell: 12, color: 'purple', axes: { rows: '4096' } })\ntext('1000\\nclasses')(dense(x.edge('dense')))\nreturn fig"
+  "src": "const fig = new Figure({ flow: 'LR' })\n// feature volumes with their extents; cells are drawn, sizes are named\nconst volume = (h, c, rows, depth, color) =>\n  voxels({ rows, cols: rows, depth, cellSize: 10, color, axes: { rows: h, cols: h, depth: c } })\n\nlet x = fig.input(image(demoImage(), { size: [56, 56], caption: '224×224×3' }))\nx = volume('55', '96', 5, 3, 'blue')(x.edge('conv 11×11'))\nx = volume('27', '256', 4, 5, 'blue')(x.edge('conv 5×5'))\nx = volume('13', '384', 3, 7, 'teal')(x.edge('conv 3×3'))\nx = volume('13', '256', 3, 6, 'teal')(x.edge('conv 3×3'))\nconst dense = matrix({ rows: 6, cols: 1, cellSize: 12, color: 'purple', axes: { rows: '4096' } })\ntext('1000\\nclasses')(dense(x.edge('dense')))\nreturn fig"
  },
  {
   "t": "Causal Self-Attention",
