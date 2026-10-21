@@ -559,3 +559,19 @@ test('plot(): samples fn over x, auto y range, breaks the curve at non-finite va
   const d = svg.match(/<path d="(M[^"]*)" fill="none" stroke="[^"]*" stroke-width="1.6"/)![1]
   expect(d.match(/M/g)!.length).toBe(2) // two branches, split at x = 0
 })
+
+test('plot(): scatter points with markers, ranges from the points, and a legend', () => {
+  const p = plot({ legend: true, points: [{ at: [[0, 1], [2, 3]], label: 'train' }, { at: [[1, -1]], marker: 'star' }] })
+  expect(p.options.x).toEqual([0, 2])
+  expect(p.options.y).toEqual([-1, 3])
+  expect(p.options.points!.map(s => [s.marker, s.color])).toEqual([['circle', 'red'], ['star', 'green']])
+  const fig = new Figure()
+  fig.input(p)
+  const svg = fig.svg()
+  expect(svg.match(/<circle /g)!.length).toBe(3) // two points + the legend's swatch; the unlabelled star gets no row
+  expect(svg).toContain('train')
+  // a point outside an explicit range is dropped
+  const cut = new Figure()
+  cut.input(plot({ x: [0, 1], points: [{ at: [[0.5, 0], [5, 0]] }] }))
+  expect(cut.svg().match(/<circle /g)!.length).toBe(1)
+})

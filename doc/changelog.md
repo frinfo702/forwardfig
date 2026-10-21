@@ -20,7 +20,7 @@ A review pass over the TypeScript API. Four changes break existing code; the [mi
 
 ### Added
 
-- `plot(fn, label?, { x, y, axes, samples, size })`: the graph of a function such as `Math.sin`, with optional axes. See [Function plots](images-and-data.md#function-plots).
+- `plot(fn?, label?, { x, y, axes, samples, size, points, name, legend })`: the graph of a function such as `Math.sin`, with optional axes, scatter points with markers (circle, square, triangle, diamond, star, cross) and a legend. See [Function plots](images-and-data.md#function-plots).
 - `style.fontFamily`: the figure's font (or one block's), with the same scoping as `fontSize`. Label widths are measured in it.
 - `figure(build)` without options.
 - `vector(values, label?, options?)` takes a label.

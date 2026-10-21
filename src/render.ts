@@ -548,8 +548,38 @@ export function render(d: Diagram, theme?: string, materials = true): string {
           o += s`<path d="M${L + 3},${ay}H${r}M${ax},${T + n.h - 3}V${t}" stroke="${c}" stroke-width=".8"/>` +
             s`<path d="M${r},${ay}l-5,-2.5v5zM${ax},${t}l-2.5,5h5z" fill="${c}"/>`
         }
+        // markers: filled shapes of radius ~r around (x, y); cross is the only stroked one
+        const marker = (m: string, x: number, y: number, r: number, c: string) => {
+          if (m === 'circle') return s`<circle cx="${x}" cy="${y}" r="${r}" fill="${c}"/>`
+          if (m === 'cross') return s`<path d="M${x - r},${y - r}L${x + r},${y + r}M${x + r},${y - r}L${x - r},${y + r}" stroke="${c}" stroke-width="1.5" stroke-linecap="round"/>`
+          const pts = m === 'square' ? [[-0.9, -0.9], [0.9, -0.9], [0.9, 0.9], [-0.9, 0.9]]
+            : m === 'triangle' ? [[0, -1.25], [1.1, 0.7], [-1.1, 0.7]]
+              : m === 'diamond' ? [[0, -1.3], [1, 0], [0, 1.3], [-1, 0]]
+                : Array.from({ length: 10 }, (_, i) => { const a = (i * Math.PI) / 5, k = i % 2 ? 0.6 : 1.45; return [k * Math.sin(a), -k * Math.cos(a)] }) // star
+          return `<path d="M${pts.map(([u, v]) => s`${x + u * r},${y + v * r}`).join('L')}z" fill="${c}"/>`
+        }
+        const series: { at: number[][]; marker: string; color: string; label?: string; size?: number }[] = JSON.parse(n.attrs.points ?? '[]')
+        const seen: number[][] = [] // screen points of the curve and markers, for placing the legend
+        ys.forEach((y, i) => Number.isFinite(y) && y >= y0 && y <= y1 && seen.push([X(x0 + ((x1 - x0) * i) / (ys.length - 1)), Y(y)]))
+        const dots = series.map(p => p.at.filter(([x, y]) => x >= x0 && x <= x1 && y >= y0 && y <= y1)
+          .map(([x, y]) => (seen.push([X(x), Y(y)]), marker(p.marker, X(x), Y(y), p.size ?? 3, pair(p.color)[1]))).join('')).join('')
         o += s`<clipPath id="${id}"><rect x="${L}" y="${T}" width="${n.w}" height="${n.h}"/></clipPath>` +
-          `<path d="${path}" fill="none" stroke="${pair(n.color)[1]}" stroke-width="1.6" stroke-linejoin="round" clip-path="url(#${id})"/>`
+          `<path d="${path}" fill="none" stroke="${pair(n.color)[1]}" stroke-width="1.6" stroke-linejoin="round" clip-path="url(#${id})"/>` + dots
+        // legend: a small key, one row per named curve / labelled series, in the corner that covers the fewest points
+        const items: { label?: string; marker: string; color: string; size?: number }[] = [...(n.attrs.name && ys.length ? [{ label: n.attrs.name, marker: '', color: n.color ?? '' }] : []), ...series.filter(p => p.label)]
+        if (n.attrs.legend === 'true' && items.length) {
+          const sz = Math.max(8, base - 4), lh = sz + 5, tw = Math.max(...items.map(p => layoutLabel(p.label!, sz, REGULAR, family).w))
+          const w = tw + 26, h = items.length * lh + 6
+          const [lx, ly] = [[L + n.w - 4 - w, T + 4], [L + 4, T + 4], [L + n.w - 4 - w, T + n.h - 4 - h], [L + 4, T + n.h - 4 - h]]
+            .map(c => [c, seen.filter(([x, y]) => x > c[0] - 4 && x < c[0] + w + 4 && y > c[1] - 4 && y < c[1] + h + 4).length] as const)
+            .reduce((a, b) => (b[1] < a[1] ? b : a))[0]
+          o += s`<rect x="${lx}" y="${ly}" width="${w}" height="${h}" rx="3" fill="${th.halo}" fill-opacity=".85" stroke="${th.sub}" stroke-opacity=".35" stroke-width=".6"/>`
+          items.forEach((p, i) => {
+            const cy = ly + 3 + (i + 0.5) * lh, c = pair(p.color)[1]
+            o += (p.marker ? marker(p.marker, lx + 11, cy, Math.min(p.size ?? 3, 3.5), c) : s`<path d="M${lx + 4},${cy}h14" stroke="${c}" stroke-width="1.6"/>`) +
+              text(p.label!, lx + 22, cy, sz, REGULAR, th.text, 'start')
+          })
+        }
         break
       }
       case 'sphere': {

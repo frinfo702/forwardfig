@@ -33,7 +33,7 @@ Everything is a named export of `forwardfig`; the default export bundles them as
 | `image` | `(src \| src[], label?, ImageOptions?)` | |
 | `vector` | `(values: string[], label?, NodeOptions?)` | |
 | `magnify`, `matrix`, `voxels`, `waveform` | `(label?, options?)` | See [Images and data](images-and-data.md). |
-| `plot` | `(fn: (x: number) => number, label?, PlotOptions?)` | See [Function plots](images-and-data.md#function-plots). |
+| `plot` | `(fn?: (x: number) => number, label?, PlotOptions?)` | See [Function plots](images-and-data.md#function-plots). |
 | `add`, `mul` | `(...xs: Tensor[])` → `Tensor` | A new ⊕ / ⊗ on each call. |
 | `preset` | `(shape, label?, color \| defaults)` → factory | `defaults.kind` names it for `kinds`. |
 | `layer` | `(shape, label, options, kind?, defaults?)` → `Layer` | The primitive the factories use. |
