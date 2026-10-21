@@ -18,7 +18,7 @@ Blocks are neutral grey until you give them a color. Textures say what a block *
 `freeze()` and `trainable()` work on a layer or on a module. On a module they apply to every block inside, unless a block is marked itself. A 🧊 or 🔥 in a label does the same.
 
 ```ts figure
-import { Figure, block, thin, add, text } from 'machine-mermaid'
+import { Figure, block, thin, add, text } from 'forwardfig'
 
 const fig = new Figure({ flow: 'BT' })
 const x = fig.input('$\\mathbf{x}$')
@@ -30,7 +30,7 @@ text('$\\mathbf{h}$')(add(W(x), B(A(x).edge('$r$'))))
 ## Textures
 
 ```ts figure
-import { Figure, block } from 'machine-mermaid'
+import { Figure, block } from 'forwardfig'
 
 const fig = new Figure({ flow: 'LR', gap: [24, 16] })
 for (const texture of ['ice', 'magma', 'glass', 'metal', 'noise', 'quantized', 'sparse', 'hatch'] as const)

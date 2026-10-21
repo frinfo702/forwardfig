@@ -14,7 +14,7 @@ Inputs and intermediate values are often better shown than named. These blocks d
 `image(src, label?, options?)` takes a URL, a data URL, an `<img>` or a `<canvas>`. An array of sources draws a stack of frames, the first one in front.
 
 ```ts figure
-import { Figure, image, linear } from 'machine-mermaid'
+import { Figure, image, linear } from 'forwardfig'
 
 const fig = new Figure({ flow: 'LR' })
 const img = fig.input(image('../assets/robin.jpg', 'Image', { size: [64, 64], grid: 4 }))
@@ -36,7 +36,7 @@ linear('Patch Embedding')(img, clip)
 `magnify(options)(img)` enlarges part of the image it is called on. It draws the region's outline and zoom lines instead of an arrow, and its output feeds the next block.
 
 ```ts figure
-import { Figure, image, magnify, linear } from 'machine-mermaid'
+import { Figure, image, magnify, linear } from 'forwardfig'
 
 const fig = new Figure({ flow: 'LR' })
 const img = fig.input(image('../assets/robin.jpg', 'Image', { size: [64, 64], grid: 4 }))
@@ -50,7 +50,7 @@ linear('Linear Projection')(magnify('patch', { patch: [1, 1], size: [44, 44] })(
 `matrix` draws a grid of cells; `voxels` draws a volume showing its front, top and right faces. A cell is a number in 0–1 (a shade of the block's color), a color string, or `{ value, color, texture, label, crossed }`.
 
 ```ts figure
-import { Figure, matrix, voxels } from 'machine-mermaid'
+import { Figure, matrix, voxels } from 'forwardfig'
 
 const fig = new Figure({ flow: 'LR' })
 const T = 5
@@ -71,7 +71,7 @@ matrix('causal attention', {
 ## 3D and signals
 
 ```ts figure
-import { Figure, gaussian, space, sphere, pointcloud, waveform } from 'machine-mermaid'
+import { Figure, gaussian, space, sphere, pointcloud, waveform } from 'forwardfig'
 
 const fig = new Figure({ flow: 'LR', gap: [36, 24] })
 let x = fig.input(waveform('audio'))

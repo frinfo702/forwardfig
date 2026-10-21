@@ -3,15 +3,15 @@ title: Draw the model the way you write it.
 nav: Overview
 group: Start
 order: 1
-description: What machine-mermaid is, what a figure looks like in code, and where to go next.
+description: What forwardfig is, what a figure looks like in code, and where to go next.
 ---
 
 # Draw the model the way you write it.
 
-machine-mermaid draws ML architecture figures from TypeScript that reads like the model itself. A block is a callable layer, a sub-network is a `Module` with `forward()`, and the figure follows the data flow. It has zero dependencies, is about 19 KB gzipped, and outputs SVG in the browser and in Node.
+forwardfig draws ML architecture figures from TypeScript that reads like the model itself. A block is a callable layer, a sub-network is a `Module` with `forward()`, and the figure follows the data flow. It has zero dependencies, is about 19 KB gzipped, and outputs SVG in the browser and in Node.
 
 ```ts figure
-import { Figure, Module, Tensor, mha, norm, ffn, text } from 'machine-mermaid'
+import { Figure, Module, Tensor, mha, norm, ffn, text } from 'forwardfig'
 
 class EncoderLayer extends Module {
   attn = mha()

@@ -1,13 +1,13 @@
-# machine-mermaid
+# forwardfig
 
 Draw ML architecture figures in TypeScript, written the way you write the model. It has zero dependencies, is about 19 KB gzipped, and outputs SVG (it also works in Node).
 
-Docs: https://frinfo702.github.io/machine-mermaid/docs/
+Docs: https://frinfo702.github.io/forwardfig/docs/
 
-Demo (paper figure gallery and playground): https://frinfo702.github.io/machine-mermaid/demo/
+Demo (paper figure gallery and playground): https://frinfo702.github.io/forwardfig/demo/
 
 ```ts
-import { Figure, Module, Tensor, mha, norm, ffn, text } from 'machine-mermaid'
+import { Figure, Module, Tensor, mha, norm, ffn, text } from 'forwardfig'
 
 class EncoderLayer extends Module {        // like nn.Module
   attn = mha()

@@ -1,16 +1,16 @@
 {
-  "name": "machine-mermaid",
+  "name": "forwardfig",
   "version": "0.1.0",
   "description": "Draw ML architecture figures in TypeScript, written the way you write the model. Zero dependencies, SVG out.",
   "type": "module",
-  "main": "dist/machine-mermaid.js",
-  "module": "dist/machine-mermaid.js",
+  "main": "dist/forwardfig.js",
+  "module": "dist/forwardfig.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "bun build src/index.ts --minify --outfile dist/machine-mermaid.js && bun build src/index.ts --minify --format=iife --outfile dist/machine-mermaid.iife.js && tsc --emitDeclarationOnly --declaration --outDir dist",
+    "build": "bun build src/index.ts --minify --outfile dist/forwardfig.js && bun build src/index.ts --minify --format=iife --outfile dist/forwardfig.iife.js && tsc --emitDeclarationOnly --declaration --outDir dist",
     "test": "bun test",
     "check": "tsc --noEmit",
     "docs:build": "bun doc/site/build.mjs",

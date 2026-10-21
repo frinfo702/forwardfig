@@ -21,7 +21,7 @@ A figure is traced, not described. You call layers on tensors as you would in Py
 A layer is one block. Calling the same layer again adds edges to the same block, so shared weights stay one block.
 
 ```ts figure
-import { Figure, enc, thin } from 'machine-mermaid'
+import { Figure, enc, thin } from 'forwardfig'
 
 const fig = new Figure({ flow: 'LR' })
 const f = enc('Encoder $f$').trainable()        // one encoder, called on two views
@@ -35,7 +35,7 @@ Functional ops are the exception: `add(...xs)` and `mul(...xs)` make a new ⊕ /
 Subclass `Module` and implement `forward()`. Layers created as fields are the module's blocks. Pass `label`, `repeat` or `box: true` to draw a group box around them.
 
 ```ts figure
-import { Figure, Module, Tensor, conv, act, add, text } from 'machine-mermaid'
+import { Figure, Module, Tensor, conv, act, add, text } from 'forwardfig'
 
 class BasicBlock extends Module {
   body = [conv('weight layer'), act('relu'), conv('weight layer')]

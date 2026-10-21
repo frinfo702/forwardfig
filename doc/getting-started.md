@@ -2,7 +2,7 @@
 title: Getting started
 group: Start
 order: 2
-description: Install machine-mermaid, draw a first figure, and put it on a page or in a file.
+description: Install forwardfig, draw a first figure, and put it on a page or in a file.
 ---
 
 # Getting started
@@ -12,9 +12,9 @@ You need a bundler or a browser that loads ES modules. Node works too, for SVG o
 ## Install
 
 ```bash
-npm install machine-mermaid
+npm install forwardfig
 # or
-bun add machine-mermaid
+bun add forwardfig
 ```
 
 ## A first figure
@@ -22,7 +22,7 @@ bun add machine-mermaid
 A figure starts from `fig.input()`. Each layer you call on a tensor draws a block and an edge into it.
 
 ```ts figure
-import { Figure, linear, act, softmax, text } from 'machine-mermaid'
+import { Figure, linear, act, softmax, text } from 'forwardfig'
 
 const fig = new Figure({ flow: 'LR' })
 let x = fig.input('$\\mathbf{x}$')

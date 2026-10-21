@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>machine-mermaid</title>
+<title>forwardfig</title>
 <meta name="description" content="Architecture figures from landmark ML papers, each redrawn from a few lines of text.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=IBM+Plex+Sans:wght@400;500;600&family=STIX+Two+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
-<!-- TeX for $...$ labels: machine-mermaid uses MathJax when the page has it -->
+<!-- TeX for $...$ labels: forwardfig uses MathJax when the page has it -->
 <script>window.MathJax = { startup: { typeset: false }, svg: { fontCache: 'local' } }</script>
 <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg-full.js"></script>
 <style>
@@ -104,8 +104,8 @@
 <body>
 <div class="wrap">
   <div class="bar">
-    <b>machine-mermaid</b>
-    <nav><a href="#figures">Figures</a><a href="#comp-h">Components</a><a href="https://github.com/frinfo702/machine-mermaid">GitHub</a><button id="theme" type="button">Dark mode</button></nav>
+    <b>forwardfig</b>
+    <nav><a href="#figures">Figures</a><a href="#comp-h">Components</a><a href="https://github.com/frinfo702/forwardfig">GitHub</a><button id="theme" type="button">Dark mode</button></nav>
   </div>
 
   <section class="hero">
@@ -160,7 +160,7 @@ return fig</textarea>
       <h2>Use it in a page</h2>
       <p>Write blocks as modules next to your model code, then compose them in a figure. <code>fig.mount()</code> draws into the page; <code>fig.svg()</code> returns a string and also works in Node. Under the hood, <code>fig.diagram()</code> is plain data that <code>draw()</code> lays out, if you want to generate figures some other way.</p>
     </div>
-<pre class="code">import { Figure, Module, mha, norm, ffn } from 'machine-mermaid'
+<pre class="code">import { Figure, Module, mha, norm, ffn } from 'forwardfig'
 
 class EncoderLayer extends Module {
   attn = mha()
@@ -377,7 +377,7 @@ fig.mount('#figure')</pre>
  }
 ]</script>
 <script type="module">
-  import mm from '../dist/machine-mermaid.js'
+  import mm from '../dist/forwardfig.js'
   const $ = id => document.getElementById(id)
   await window.MathJax?.startup?.promise
 

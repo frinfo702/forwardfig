@@ -9,10 +9,10 @@ const docRoot = path.resolve(here, "..");
 const siteRoot = path.join(docRoot, "site");
 const outRoot = path.join(docRoot, "dist");
 
-const SITE_NAME = "machine-mermaid";
+const SITE_NAME = "forwardfig";
 const GROUP_ORDER = ["Start", "Guide", "Reference"];
-const REPO_URL = "https://github.com/frinfo702/machine-mermaid";
-// where the site is served from: "/" locally, "/machine-mermaid/docs/" on GitHub Pages
+const REPO_URL = "https://github.com/frinfo702/forwardfig";
+// where the site is served from: "/" locally, "/forwardfig/docs/" on GitHub Pages
 const BASE = process.env.DOCS_BASE ?? "/";
 
 const escapeHtml = (value) =>
@@ -265,7 +265,7 @@ function pageTemplate(page, content) {
     <aside class="sidebar" id="sidebar">
       <a class="brand" href="${BASE}">
         ${brandMark()}
-        <span class="brand-name">machine-mermaid</span>
+        <span class="brand-name">forwardfig</span>
         <span class="brand-tag">docs</span>
       </a>
       <button class="search-trigger" type="button" data-search-open>
@@ -284,7 +284,7 @@ function pageTemplate(page, content) {
     </aside>
     <div class="page">
       <header class="mobile-bar">
-        <a class="brand brand-mobile" href="${BASE}">${brandMark()}<span class="brand-name">machine-mermaid</span></a>
+        <a class="brand brand-mobile" href="${BASE}">${brandMark()}<span class="brand-name">forwardfig</span></a>
         <button class="icon-button" type="button" data-menu aria-label="Open navigation" aria-expanded="false">
           <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M3 6h14M3 10h14M3 14h14"/></svg>
         </button>
@@ -329,7 +329,7 @@ function notFoundTemplate() {
 </head>
 <body class="not-found">
   <main>
-    <a class="brand" href="${BASE}">${brandMark()}<span class="brand-name">machine-mermaid</span></a>
+    <a class="brand" href="${BASE}">${brandMark()}<span class="brand-name">forwardfig</span></a>
     <p class="eyebrow">404</p>
     <h1>No block here.</h1>
     <p>The address may have changed, or the page was removed. The docs start at the overview.</p>

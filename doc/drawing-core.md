@@ -10,7 +10,7 @@ description: The plain Diagram data under the API, and how to drive layout and r
 The layout and rendering engine does not know about layers or modules. `fig.diagram()` compiles a figure into plain `Diagram` data, and `draw(diagram)` turns it into SVG. Anything that can produce a `Diagram` — another language, a JSON file, a model exporter — can use the same engine.
 
 ```ts
-import { draw } from 'machine-mermaid'
+import { draw } from 'forwardfig'
 
 const svg = draw(diagram, { theme: 'dark', materials: false })
 ```

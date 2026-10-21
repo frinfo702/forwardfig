@@ -2,7 +2,7 @@
 title: Changelog
 group: Reference
 order: 3
-description: Recent changes to machine-mermaid, with a migration table for the renamed APIs.
+description: Recent changes to forwardfig, with a migration table for the renamed APIs.
 ---
 
 # Changelog
@@ -54,4 +54,4 @@ A review pass over the TypeScript API. Four changes break existing code; the [mi
 
 ## Earlier
 
-Columns that flow back up and side-joining taps (`join: 'side'`); axis names for matrix and voxels; per-cell looks; `magnify`; frames of different images; tilted and rotated images; point clouds and waveforms; `repeatSide`; MathJax typesetting; `preset()` and the scoped style config. See the [commit history](https://github.com/frinfo702/machine-mermaid/commits/main).
+Columns that flow back up and side-joining taps (`join: 'side'`); axis names for matrix and voxels; per-cell looks; `magnify`; frames of different images; tilted and rotated images; point clouds and waveforms; `repeatSide`; MathJax typesetting; `preset()` and the scoped style config. See the [commit history](https://github.com/frinfo702/forwardfig/commits/main).
