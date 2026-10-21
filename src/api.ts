@@ -466,6 +466,14 @@ export interface FigureOptions extends StyleConfig {
   gap?: V2
   /** bake WebGL ice / magma when available (default true) */
   materials?: boolean
+  /** a key to the looks used: ❄ frozen, 🔥 trainable, each texture, ✕ crossed */
+  legend?: boolean | LegendOptions
+}
+export interface LegendOptions {
+  /** default 'bottom' */
+  position?: 'bottom' | 'right'
+  /** names to show instead of the defaults, e.g. { trainable: 'Trained', quantized: '4-bit' } */
+  labels?: Partial<Record<'frozen' | 'trainable' | Exclude<Texture, 'ice' | 'magma'> | 'crossed', string>>
 }
 
 export type { TexEngine }
@@ -562,6 +570,7 @@ export class Figure {
     }))
     return {
       dir: cfg.flow ?? 'TB', theme: cfg.theme ?? 'light', gap: cfg.gap, fontSize: cfg.style?.fontSize,
+      legend: cfg.legend === true ? {} : cfg.legend || undefined,
       nodes, edges, groups: [...g.groups.values()].map(x => ({ ...x, flags: new Set(x.flags) })), ranks: g.ranks.map(rs => rs.map(r => g.id(r))),
     }
   }

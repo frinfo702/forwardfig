@@ -85,6 +85,7 @@ Common options: `color` `texture` `frozen` `trainable` `crossed` `dashed` `bold`
 
   When both are set, `texture` decides the surface, and the ❄/🔥 badge follows `freeze()` / `trainable()` (for example `block({ texture: 'quantized' }).freeze()` in QLoRA). Without WebGL, glass, metal and noise fall back to lightweight vector versions.
 
+- `new Figure({ legend: true })` adds a key under the figure for the looks it uses (❄ frozen, 🔥 trainable, each texture, ✕ crossed). `legend: { position: 'right', labels: { quantized: '4-bit' } }` moves it beside the figure and renames entries.
 - Placement is automatic by default. To override it, use `lane` (fractions allowed), `align: ref`, `leftOf` / `rightOf` / `above` / `below: ref` (with `dist`), `at: [x, y]` or `nudge: [dx, dy]`.
 - `freeze()` / `trainable()` can be called on a layer or on a module. On a module they apply to every block inside it, unless a layer is marked explicitly.
 - A 🧊 or 🔥 in a label works the same way.
@@ -133,7 +134,7 @@ configure(null)                                                             // r
 - At each level, `kinds[kind]` (for one preset) beats `style` (for all blocks).
 - `style` can set `color` `texture` `fontSize` `dashed` `bold`. At the Figure / `configure` level, `fontSize` also sizes edge labels, group titles and captions.
 - A `texture` set through style doesn't override `freeze()` / `trainable()` (ice and magma win). A texture set on the block itself does.
-- `configure` also takes `theme` `flow` `gap` `materials`.
+- `configure` also takes `theme` `flow` `gap` `materials` `legend`.
 
 ## Export
 
