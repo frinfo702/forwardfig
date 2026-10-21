@@ -36,7 +36,7 @@ function size(n: Node, horiz: boolean, base: number) {
   switch (n.shape) {
     case 'thin': w = Math.max(lb.w + 26, 64); h = lb.h + 9; break
     case 'op': w = h = 22; break
-    case 'var': w = h = Math.max(42, lb.w + 18, lb.h + 16); break
+    case 'circle': w = h = Math.max(42, lb.w + 18, lb.h + 16); break
     case 'tensor': { const [W, H, D] = nums(n.attrs.size, [36, 64, 20]); w = W + D * 0.6; h = H + D * 0.6; break }
     case 'stack': { const [W, H] = nums(n.attrs.size, [44, 60]); const k = +n.attrs.n || 4, o = +n.attrs.offset || 7; w = W + (k - 1) * o; h = H + (k - 1) * o; break }
     case 'enc': case 'dec':
@@ -59,8 +59,8 @@ function size(n: Node, horiz: boolean, base: number) {
       break
     }
     case 'magnify': [w, h] = nums(n.attrs.size, [64, 64]); break
-    case 'matrix': { const k = +n.attrs.cell || 16; w = +n.attrs.cols * k; h = +n.attrs.rows * k; break }
-    case 'voxels': { const k = +n.attrs.cell || 16, dz = +n.attrs.depth * k * 0.5; w = +n.attrs.cols * k + dz; h = +n.attrs.rows * k + dz; break }
+    case 'matrix': { const k = +n.attrs.cellSize || 16; w = +n.attrs.cols * k; h = +n.attrs.rows * k; break }
+    case 'voxels': { const k = +n.attrs.cellSize || 16, dz = +n.attrs.depth * k * 0.5; w = +n.attrs.cols * k + dz; h = +n.attrs.rows * k + dz; break }
     case 'gaussian': [w, h] = nums(n.attrs.size, [120, 84]); break
     case 'space': [w, h] = nums(n.attrs.size, [110, 100]); break
     case 'sphere': [w, h] = nums(n.attrs.size, [84, 84]); break

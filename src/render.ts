@@ -35,10 +35,16 @@ export const THEMES: Record<string, Theme> = {
 // numbers in templates are rounded to 0.1px: keeps the SVG small
 const f = (n: number) => +n.toFixed(1)
 const s = (str: TemplateStringsArray, ...v: unknown[]) => str.reduce((a, b, i) => a + (typeof v[i - 1] === 'number' ? f(v[i - 1] as number) : v[i - 1]) + b)
-const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
+const isHex = (c: string) => /^#([\da-f]{3}|[\da-f]{6})$/i.test(c)
 const hex = (c: string) => { const m = c.replace('#', ''); const x = m.length === 3 ? [...m].map(k => k + k).join('') : m; return [0, 2, 4].map(i => parseInt(x.slice(i, i + 2), 16)) }
-const mix = (a: string, b: string, t: number) => '#' + hex(a).map((x, i) => Math.round(x + (hex(b)[i] - x) * t).toString(16).padStart(2, '0')).join('')
+// only #hex can be mixed; any other CSS color is kept as it is
+const mix = (a: string, b: string, t: number) => {
+  if (!isHex(a) || !isHex(b)) return a
+  t = Math.min(1, Math.max(0, t))
+  return '#' + hex(a).map((x, i) => Math.round(x + (hex(b)[i] - x) * t).toString(16).padStart(2, '0')).join('')
+}
 
 const rr = (x: number, y: number, w: number, h: number, r: number) => {
   r = Math.min(r, w / 2, h / 2)
@@ -82,6 +88,8 @@ const utterance = (cols: number): number[][] =>
     return [-a * (0.85 + 0.15 * Math.sin(i * 2.3)), a]
   })
 const CLASSES = ['blue', 'orange', 'green', 'purple', 'red', 'teal', 'pink', 'yellow']
+// any number names a class: wrapped into CLASSES, negatives and fractions included
+const klass = (k: number) => CLASSES[(((k | 0) % CLASSES.length) + CLASSES.length) % CLASSES.length]
 
 type CellData = { v?: number; c?: string; t?: string; l?: string; x?: boolean }
 
@@ -92,17 +100,25 @@ export function render(d: Diagram, theme?: string, materials = true): string {
   const P = `mm${uid++}-`
   const horiz = d.dir === 'LR' || d.dir === 'RL', base = d.fontSize ?? FS
   const defs = new Map<string, string>()
+  // def id part per color: palette names and #hex as they are, any other CSS color numbered
+  const tags = new Map<string, string>()
+  const tag = (c?: string) => {
+    if (!c) return 'none'
+    if (/^#?\w+$/.test(c)) return c.replace('#', '')
+    if (!tags.has(c)) tags.set(c, `css${tags.size}`)
+    return tags.get(c)!
+  }
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
   const box = (x: number, y: number, w = 0, h = 0) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x + w); y1 = Math.max(y1, y + h) }
 
   const pair = (c?: string): Pair => {
     if (!c) return th.none
     if (th.c[c]) return th.c[c]
-    if (c[0] === '#') return [th.dark ? mix(c, '#0e1117', 0.75) : mix(c, '#ffffff', 0.78), c]
-    return [c, th.edge]
+    if (isHex(c)) return [th.dark ? mix(c, '#0e1117', 0.75) : mix(c, '#ffffff', 0.78), c]
+    return [esc(c), th.edge]
   }
   const grad = (c?: string) => {
-    const key = 'c-' + (c ?? 'none').replace('#', '')
+    const key = 'c-' + tag(c)
     if (!defs.has(key)) {
       const [fill, stroke] = pair(c)
       const top = th.dark ? mix(fill, stroke, 0.16) : mix(fill, '#ffffff', 0.6)
@@ -185,7 +201,7 @@ export function render(d: Diagram, theme?: string, materials = true): string {
   // crisp vector textures, one <pattern> per (kind, color)
   const PATTERN = new Set(['quantized', 'sparse', 'hatch'])
   const pattern = (kind: string, color?: string) => {
-    const key = `p-${kind}-${(color ?? 'none').replace('#', '')}`
+    const key = `p-${kind}-${tag(color)}`
     if (!defs.has(key)) {
       const [c0, c1] = pair(color)
       let tile = 24, body = '', rot = ''
@@ -294,7 +310,7 @@ export function render(d: Diagram, theme?: string, materials = true): string {
         o += g ? `<path d="${g}" fill="none" stroke="${stroke}" stroke-width="1.5" stroke-linecap="round"/>` : text(n.label, n.x, n.y, size, 500, th.text)
         break
       }
-      case 'var': o = body(circ(n.x, n.y, n.w / 2), [L, T, n.w, n.h]) + label(); break
+      case 'circle': o = body(circ(n.x, n.y, n.w / 2), [L, T, n.w, n.h]) + label(); break
       case 'tensor': {
         const [W, H, D] = nums(n.attrs.size, [36, 64, 20]), dd = D * 0.6
         const x = L, y = T + dd, [c0, c1] = pair(n.color)
@@ -332,7 +348,7 @@ export function render(d: Diagram, theme?: string, materials = true): string {
       }
       case 'matrix': case 'voxels': {
         // cells: rect / parallelogram corners + its data; `shade` lightens the top face, darkens the side
-        const k = +n.attrs.cell || 16, cells: [number[][], CellData, number][] = []
+        const k = +n.attrs.cellSize || 16, cells: [number[][], CellData, number][] = []
         if (n.shape === 'matrix') {
           (JSON.parse(n.attrs.grid) as CellData[][]).forEach((row, r) => row.forEach((c, j) =>
             cells.push([[[L + j * k, T + r * k], [L + (j + 1) * k, T + r * k], [L + (j + 1) * k, T + (r + 1) * k], [L + j * k, T + (r + 1) * k]], c, 0])))
@@ -347,7 +363,7 @@ export function render(d: Diagram, theme?: string, materials = true): string {
         }
         const [c0, c1] = pair(n.color), gap = th.dark ? '#0e1117' : '#ffffff'
         for (const [p, c, shade] of cells) {
-          let fill = c.c ? (th.c[c.c] ? mix(th.c[c.c][0], th.c[c.c][1], 0.55) : c.c) : mix(th.dark ? c1 : mix(c0, '#ffffff', 0.4), th.dark ? c0 : c1, th.dark ? 1 - (c.v ?? 0.5) : c.v ?? 0.5)
+          let fill = c.c ? (th.c[c.c] ? mix(th.c[c.c][0], th.c[c.c][1], 0.55) : esc(c.c)) : mix(th.dark ? c1 : mix(c0, '#ffffff', 0.4), th.dark ? c0 : c1, th.dark ? 1 - (c.v ?? 0.5) : c.v ?? 0.5)
           fill = shade > 0 ? mix(fill, '#ffffff', shade) : shade < 0 ? mix(fill, '#0b1a2e', -shade) : fill
           const d = 'M' + p.map(q => q.map(f).join(',')).join('L') + 'z'
           o += `<path d="${d}" fill="${fill}" stroke="${gap}" stroke-width="1.5" stroke-linejoin="round"/>`
@@ -459,7 +475,7 @@ export function render(d: Diagram, theme?: string, materials = true): string {
       }
       case 'space': {
         const [c0, c1] = pair(n.color)
-        const pts: number[][] = JSON.parse(n.attrs.points ?? '[]'), axes: string[] = JSON.parse(n.attrs.axes ?? '["x","y","z"]')
+        const pts: number[][] = JSON.parse(n.attrs.points ?? '[]'), axes = Object.values({ x: 'x', y: 'y', z: 'z', ...JSON.parse(n.attrs.axes ?? '{}') }) as string[]
         // back panes: the far x wall, the far y wall and the floor, like a matplotlib 3D axes
         const xf = proj(1, 0, 0)[2] > proj(-1, 0, 0)[2] ? 1 : -1, yf = proj(0, 1, 0)[2] > proj(0, -1, 0)[2] ? 1 : -1
         const corners = [-1, 1].flatMap(x => [-1, 1].flatMap(y => [-1, 1].map(z => proj(x, y, z))))
@@ -474,7 +490,7 @@ export function render(d: Diagram, theme?: string, materials = true): string {
         o += `<path d="${grid}" stroke="${c1}" stroke-opacity=".18"/>`
         const sorted = pts.map(p => [...p, proj(p[0], p[1], p[2])[2]]).sort((a, b) => b[b.length - 1] - a[a.length - 1])
         for (const p of sorted) {
-          const [x, y] = m(proj(p[0], p[1], p[2])), c = th.c[CLASSES[(p.length > 4 ? p[3] : 0) % CLASSES.length]][1]
+          const [x, y] = m(proj(p[0], p[1], p[2])), c = th.c[klass(p.length > 4 ? p[3] : 0)][1]
           o += s`<circle cx="${x}" cy="${y}" r="3.2" fill="${c}" stroke="${th.dark ? '#0e1117' : '#fff'}" stroke-width=".9"/>`
         }
         const lab = (t: string, x: number, y: number, z: number) => { const [a, b] = m(proj(x, y, z)); return text(t, a, b, base - 2, 400, th.sub) }
@@ -494,7 +510,7 @@ export function render(d: Diagram, theme?: string, materials = true): string {
         P.sort((a, b) => b[2] - a[2]) // far first
         for (const p of P) {
           const near = (d1 - p[2]) / (d1 - d0 || 1), [x, y] = m(p)
-          const c = p[3] !== undefined ? th.c[CLASSES[p[3] % CLASSES.length]][1] : mix(c0, c1, 0.3 + 0.7 * near)
+          const c = p[3] !== undefined ? th.c[klass(p[3])][1] : mix(c0, c1, 0.3 + 0.7 * near)
           o += s`<circle cx="${x}" cy="${y}" r="${1 + 1.4 * near}" fill="${c}" fill-opacity="${0.5 + 0.5 * near}"/>`
         }
         box(L, T, n.w, n.h)
@@ -513,7 +529,7 @@ export function render(d: Diagram, theme?: string, materials = true): string {
         break
       }
       case 'sphere': {
-        const [c0, c1] = pair(n.color), R = Math.min(n.w, n.h) / 2 - 2, key = 'sph-' + (n.color ?? 'none').replace('#', '')
+        const [c0, c1] = pair(n.color), R = Math.min(n.w, n.h) / 2 - 2, key = 'sph-' + tag(n.color)
         if (!defs.has(key)) defs.set(key, `<radialGradient id="${P}${key}" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="${th.dark ? mix(c0, c1, 0.35) : '#ffffff'}"/><stop offset=".55" stop-color="${c0}"/><stop offset="1" stop-color="${mix(c0, c1, 0.35)}"/></radialGradient>`)
         o += s`<circle cx="${n.x}" cy="${n.y}" r="${R}" fill="url(#${P}${key})" stroke="${c1}"/>`
         let front = '', back = ''
@@ -532,7 +548,7 @@ export function render(d: Diagram, theme?: string, materials = true): string {
         const pts: number[][] = JSON.parse(n.attrs.points ?? '[]')
         for (const p of pts) {
           const l = Math.hypot(p[0], p[1], p[2]) || 1, [a, b, dz] = proj(p[0] / l, p[1] / l, p[2] / l)
-          const c = th.c[CLASSES[(p[3] ?? 0) % CLASSES.length]][1]
+          const c = th.c[klass(p[3] ?? 0)][1]
           o += s`<circle cx="${n.x + a * R}" cy="${n.y + b * R}" r="3" fill="${c}" stroke="${th.dark ? '#0e1117' : '#fff'}" stroke-width=".8" opacity="${dz <= 0 ? 1 : 0.3}"/>`
         }
         box(L, T, n.w, n.h)
@@ -547,12 +563,12 @@ export function render(d: Diagram, theme?: string, materials = true): string {
     if (n.attrs.caption) o += text(n.attrs.caption, n.x, n.y + n.h / 2 + 12, base - 1, 400, th.sub)
     const b = mark(n, fx)
     if (b) {
-      const round = n.shape === 'op' || n.shape === 'var'
+      const round = n.shape === 'op' || n.shape === 'circle'
       o += round ? badge(b, n.x + n.w * 0.36, n.y - n.h * 0.36) : badge(b, L + n.w - 2, T + 2)
     }
     if (n.flags.has('crossed')) {
       // dim the block and strike it through; round shapes get the ✕ inside the circle
-      const k = n.shape === 'op' || n.shape === 'var' ? n.w * 0.15 : 3
+      const k = n.shape === 'op' || n.shape === 'circle' ? n.w * 0.15 : 3
       o = `<g opacity=".5">${o}</g>` + cross(L + k, T + k, L + n.w - k, T + n.h - k, 2.2)
     }
     return `<g>${o}</g>`
@@ -567,7 +583,7 @@ export function render(d: Diagram, theme?: string, materials = true): string {
   // --- edges
   const drawEdge = (e: Edge) => {
     if (isZoom(e)) return '' // drawn as zoom lines
-    const color = e.attrs.color ? pair(e.attrs.color)[1] : th.edge
+    const c = e.attrs.color, color = !c ? th.edge : th.c[c] || isHex(c) ? pair(c)[1] : esc(c)
     if (e.fc) return fc(e, color)
     const p = e.pts.map(q => [...q] as [number, number])
     if (p.length < 2) return ''
