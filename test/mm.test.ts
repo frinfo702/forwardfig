@@ -223,3 +223,21 @@ test('tex: a conditional bar gets thin spaces, |x| does not', () => {
   expect(w('$a|b$')).toBeGreaterThan(w('$ab$') + w('$|$') + 13 * 1.1 * 0.25)
   expect(w('$|x|$')).toBeLessThan(w('$x$') + 2 * w('$|$') + 13 * 1.1 * 0.1) // only the italic correction
 })
+
+test('a TeX engine replaces the built-in math layout', () => {
+  // shape of MathJax's tex2svg output: viewBox in 1/1000 em, baseline at y = 0
+  const fake = (tex: string) => `<svg width="2ex" viewBox="0 -750 2000 1000"><g data-tex="${tex}"/></svg>`
+  try {
+    configure({ tex: fake })
+    const b = layoutLabel('a $\\theta$', 10)
+    const m = b.lines[0].find(r => r.math)!.math!
+    expect(m.w).toBeCloseTo(22)          // 2000/1000 em at 11px (math is 1.1× the label)
+    expect(m.asc).toBeCloseTo(8.25)
+    const svg = figure({}, fig => { fig.input('$\\theta$') }).svg()
+    expect(svg).toContain('data-tex="\\theta"')
+    expect(svg).toContain('viewBox="0 -750 2000 1000"')
+  } finally {
+    configure(null)
+  }
+  expect(layoutLabel('a $\\theta$', 10).lines[0].some(r => r.math)).toBe(false)
+})

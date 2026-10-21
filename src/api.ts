@@ -1,5 +1,6 @@
 import { layout } from './layout'
 import { render } from './render'
+import { setTex, type TexEngine } from './tex'
 import type { Diagram, Dir, Edge, Group, Node } from './types'
 
 // The modeling API. It mirrors how the model is written:
@@ -333,14 +334,24 @@ export interface FigureOptions extends StyleConfig {
   materials?: boolean
 }
 
+export type { TexEngine }
+/** configure() also takes the TeX engine: MathJax is used automatically when the page has it */
+export interface Config extends FigureOptions {
+  /** tex → <svg viewBox> (MathJax tex2svg shape); null = built-in fallback only */
+  tex?: TexEngine | null
+}
+
 let defaults: FigureOptions = {}
 /**
  * Library-wide defaults, like matplotlib's rcParams. Figures, modules and blocks
  * override them; `configure(null)` resets. Returns the current config.
  *   configure({ style: { fontSize: 14, color: 'gray' }, kinds: { mha: { color: 'purple' } } })
  */
-export function configure(config: FigureOptions | null): FigureOptions {
-  defaults = config === null ? {} : merge(defaults, config)
+export function configure(config: Config | null): FigureOptions {
+  if (config === null) setTex(undefined)
+  else if ('tex' in config) setTex(config.tex)
+  const { tex: _, ...rest } = config ?? {}
+  defaults = config === null ? {} : merge(defaults, rest)
   return defaults
 }
 const merge = (a: FigureOptions, b: FigureOptions): FigureOptions => {

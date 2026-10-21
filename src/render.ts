@@ -111,11 +111,16 @@ export function render(d: Diagram, theme?: string, materials = true): string {
 
   const text = (label: string, cx: number, cy: number, size: number, weight: number, color: string, anchor: 'start' | 'middle' | 'end' = 'middle') => {
     const b = layoutLabel(label, size, weight)
-    let o = ''
+    let o = '', math = ''
     b.lines.forEach((runs, i) => {
       const x = anchor === 'middle' ? cx - b.widths[i] / 2 : anchor === 'start' ? cx : cx - b.widths[i]
       const y = cy - b.h / 2 + (i + 0.5) * b.lh + size * 0.36
       for (const r of runs) {
+        if (r.math) {
+          const m = r.math
+          math += s`<svg x="${x + r.x}" y="${y - m.asc}" width="${m.w}" height="${m.asc + m.desc}" viewBox="${m.viewBox}" overflow="visible" color="${color}">${m.inner}</svg>`
+          continue
+        }
         o += s`<tspan x="${x + r.x}" y="${y + r.dy}"`
         if (r.size !== size) o += s` font-size="${r.size}"`
         if (r.it) o += ' font-style="italic"'
@@ -125,7 +130,7 @@ export function render(d: Diagram, theme?: string, materials = true): string {
       }
     })
     box(cx - (anchor === 'middle' ? b.w / 2 : anchor === 'end' ? b.w : 0), cy - b.h / 2, b.w, b.h)
-    return s`<text font-size="${size}" font-weight="${weight}" fill="${color}" style="white-space:pre">${o}</text>`
+    return (o ? s`<text font-size="${size}" font-weight="${weight}" fill="${color}" style="white-space:pre">${o}</text>` : '') + math
   }
 
   // the badge says frozen / trainable, independent of the texture

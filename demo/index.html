@@ -8,6 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=IBM+Plex+Sans:wght@400;500;600&family=STIX+Two+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<!-- TeX for $...$ labels: machine-mermaid uses MathJax when the page has it -->
+<script>window.MathJax = { startup: { typeset: false }, svg: { fontCache: 'local' } }</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg-full.js"></script>
 <style>
   :root {
     --bg:#e9edf1; --plate:#ffffff; --ink:#142030; --muted:#5b6878; --rule:#d3dae2; --ice:#3d8bc4; --magma:#d9531e;
@@ -334,6 +337,7 @@ fig.mount('#figure')</pre>
 <script type="module">
   import mm from '../dist/machine-mermaid.js'
   const $ = id => document.getElementById(id)
+  await window.MathJax?.startup?.promise
 
   // The sample image for the figures (photo: Allan Cox, Unsplash), cropped square,
   // optionally with Gaussian noise mixed in.

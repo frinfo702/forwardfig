@@ -1,10 +1,35 @@
-// Tiny TeX → positioned text runs. Covers the subset that shows up in ML figures
-// ($\mathbf{x}_t$, $p_\theta(x_{t-1}|x_t)$, $\mathcal{L}$, ...) without shipping KaTeX.
+// Labels → positioned text runs. Math ($...$) goes to a real TeX engine when one is
+// available (MathJax's SVG output: true TeX metrics and glyphs, embedded as paths);
+// otherwise a tiny built-in fallback covers the subset ML figures use.
 
 export const SANS = 'Inter,"Helvetica Neue",Helvetica,Arial,sans-serif'
 export const SERIF = '"Latin Modern Math","STIX Two Math","Cambria Math","Times New Roman",serif'
 
-export interface Run { t: string; x: number; dy: number; size: number; it: boolean; b: boolean; serif: boolean }
+export interface Run {
+  t: string; x: number; dy: number; size: number; it: boolean; b: boolean; serif: boolean
+  /** typeset math from the TeX engine: inner SVG markup, its viewBox, and its box around the baseline */
+  math?: { inner: string; viewBox: string; w: number; asc: number; desc: number }
+}
+
+/** tex source → an <svg viewBox="..."> string, as MathJax's tex2svg produces (1000 viewBox units per em). */
+export type TexEngine = (tex: string) => string
+let engine: TexEngine | null | undefined
+/** Use a TeX engine (null = always the built-in fallback, undefined = auto-detect MathJax). */
+export function setTex(e: TexEngine | null | undefined) { engine = e; boxes.clear() }
+const mathjax = (): TexEngine | null => {
+  const mj = (globalThis as { MathJax?: { tex2svg?: (t: string, o: object) => Element } }).MathJax
+  return mj?.tex2svg ? t => mj.tex2svg!(t, { display: false }).querySelector('svg')?.outerHTML ?? '' : null
+}
+const typeset = (tex: string, size: number): Run['math'] | null => {
+  const e = engine === undefined ? mathjax() : engine
+  if (!e) return null
+  let svg: string
+  try { svg = e(tex) } catch { return null } // e.g. MathJax wanting to load an extension asynchronously
+  const vb = /viewBox="([^"]+)"/.exec(svg)?.[1]
+  if (!vb) return null
+  const [, y0, vw, vh] = vb.trim().split(/[\s,]+/).map(Number), k = size / 1000
+  return { inner: svg.replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, ''), viewBox: vb, w: vw * k, asc: -y0 * k, desc: (vh + y0) * k }
+}
 export interface TextBox { lines: Run[][]; widths: number[]; w: number; h: number; lh: number; size: number }
 
 type Style = { it?: boolean; b?: boolean; up?: boolean; text?: boolean; sans?: boolean; map?: (c: string) => string }
@@ -98,6 +123,8 @@ function parseMath(s: string): Item[] {
   return seq({})
 }
 
+const boxes = new Map<string, TextBox>()
+
 // --- measurement --------------------------------------------------------------
 
 let ctx: CanvasRenderingContext2D | null | undefined
@@ -130,11 +157,9 @@ export function measure(t: string, f: string, size: number): number {
 
 // --- label layout ------------------------------------------------------------
 
-const boxes = new Map<string, TextBox>()
-
 /** Lay out a label: newline, `\\` or `<br>` break lines, `$...$` switches to math. */
 export function layoutLabel(label: string, size: number, weight = 400): TextBox {
-  const key = label + '\0' + size + '\0' + weight
+  const key = label + '\0' + size + '\0' + weight + '\0' + (engine === undefined ? !!mathjax() : !!engine)
   const hit = boxes.get(key)
   if (hit) return hit
   const lines: Run[][] = [], widths: number[] = []
@@ -182,7 +207,9 @@ export function layoutLabel(label: string, size: number, weight = 400): TextBox 
       }
     }
     line.split('$').forEach((part, k) => {
-      if (k % 2) place(parseMath(part), 0, size * 1.1, true)
+      const m = k % 2 ? typeset(part, size * 1.1) : null
+      if (m) { runs.push({ t: '', x, dy: 0, size, it: false, b: false, serif: true, math: m }); x += m.w }
+      else if (k % 2) place(parseMath(part), 0, size * 1.1, true)
       else if (part) place([{ t: part, it: false, b: false, serif: false }], 0, size)
     })
     lines.push(runs)

@@ -85,7 +85,18 @@ Common options: `color` `texture` `frozen` `train` `crossed` `dashed` `bold` `w`
 
 Edges (`x.edge({...})` / `fig.edge(a, b, {...})`): `label` `crossed` `dashed` `arrow: 'end' | 'both' | 'none'` `thick` `dense` (fully connected between `neurons`) `skip` `curve` `side` `color`
 
-Labels: a newline (`\n`) starts a new line, and `$...$` is TeX. Supported: `^ _ \mathbf \mathrm \text \boldsymbol \mathcal \mathbb`, Greek letters, common symbols, `\hat \tilde \bar \vec`, and `\frac` (rendered as a/b).
+Labels: a newline (`\n`) starts a new line, and `$...$` is TeX.
+
+- **When the page loads MathJax 3**, math is typeset by it automatically. It's embedded in the SVG as paths drawn with real TeX metrics and glyphs. Use `tex-svg-full.js`, because the other builds load some extensions asynchronously.
+
+  ```html
+  <script>window.MathJax = { startup: { typeset: false }, svg: { fontCache: 'local' } }</script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg-full.js"></script>
+  <script type="module">await MathJax.startup.promise; /* draw figures */</script>
+  ```
+
+- **In Node, or with any other engine**, pass a function that returns an `<svg viewBox>` (1000 units per em) via `configure({ tex: src => ... })`. With `mathjax-full`, `tex: t => adaptor.outerHTML(html.convert(t, { display: false }))` works.
+- **Without MathJax**, a built-in lightweight engine handles it. It covers `^ _ \mathbf \mathrm \text \boldsymbol \mathcal \mathbb`, Greek letters, common symbols, `\hat \tilde \bar \vec` and `\frac` (rendered as a/b), with TeX-like spacing. Force it with `configure({ tex: null })`.
 
 ## Custom presets
 
