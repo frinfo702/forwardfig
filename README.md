@@ -11,6 +11,16 @@ Draw ML architecture figures in TypeScript, written the way you write the model.
 npm install forwardfig   # or: pnpm add / yarn add / bun add forwardfig, deno add npm:forwardfig
 ```
 
+### Agent skill
+
+To have a coding agent (Claude Code, Codex, Cursor, …) draw figures with forwardfig, install the skill in [`skills/forwardfig-diagrams`](skills/forwardfig-diagrams/SKILL.md):
+
+```sh
+npx skills add frinfo702/forwardfig
+```
+
+It gives the agent the API, layout tips and worked paper figures, and has it render to PNG and check the result.
+
 ## Example
 
 ```ts
