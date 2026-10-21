@@ -420,6 +420,28 @@ test('a column that flows back up stays straight; side taps join as an L', () =>
   expect(tap.pts[2][1]).toBeCloseTo(node('up2').y)               // into the side
 })
 
+test('two streams through a shared block both fold back up, whatever the search reaches first', () => {
+  // each stream runs down (n → s → shared), turns, and runs back up (u1 → u2) beside itself
+  const fig = new Figure({ flow: 'TB' })
+  const shared = block('shared', { lane: 1.5 })
+  const down = (l: number) => {
+    const n = block('n', { lane: l }), s = block('s', { lane: l })
+    return { n, s, h: s(n(fig.input('x', { lane: l }))) }
+  }
+  const a = down(1), b = down(2)
+  const y = shared(a.h, b.h)
+  for (const [st, l] of [[a, 0], [b, 3]] as const) {
+    const u1 = block('u1', { lane: l }), u2 = block('u2', { lane: l })
+    u2(u1(y))
+    fig.rank(u1, st.s).rank(u2, st.n)
+  }
+  const d = layout(fig.diagram())
+  const ys = (l: string) => [...d.nodes.values()].filter(n => n.label === l).map(n => n.y)
+  expect(new Set([...ys('n'), ...ys('u2')]).size).toBe(1)   // u2 sits on the row of n, in both streams
+  expect(new Set([...ys('s'), ...ys('u1')]).size).toBe(1)
+  expect(ys('u2')[0]).toBeLessThan(ys('u1')[0])              // and the fold runs back up
+})
+
 test('edge labels avoid blocks, other edges and each other', () => {
   for (const [flow, names] of [['TB', ['$\\alpha$ weight', '$\\beta$ weight', '$\\gamma$ weight']], ['LR', ['alpha', 'beta', 'gamma']]] as const) {
     const fig = new Figure({ flow })
@@ -533,6 +555,17 @@ test('layout: lanes are reordered when declaration order would cross edges', () 
   expect([x === a, y === c]).toEqual([true, true]) // chains stay straight
   // an explicit lane is never overridden, even when that leaves the crossing
   expect(crossings(build(1))).toBe(1)
+})
+
+test('layout: a negative lane adds a column before lane 0', () => {
+  const d = layout(figure(fig => {
+    block('a')(fig.input('x'))
+    block('b')(fig.input('y', { lane: -1 }))
+    block('c', { lane: -0.5 })(fig.input('z', { lane: -1 }))
+  }).diagram())
+  const x = (s: string) => [...d.nodes.values()].find(n => n.label === s)!.x
+  expect(x('b')).toBeLessThan(x('a'))          // TB: lane -1 sits left of lane 0
+  expect(x('c')).toBeCloseTo((x('a') + x('b')) / 2)
 })
 
 test('empty(): a zero-size point that draws nothing, so edges start or end in empty space', () => {

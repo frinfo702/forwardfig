@@ -46,6 +46,8 @@ A review pass over the TypeScript API. Four changes break existing code; the [mi
 | Changing what `configure()` returned changed the global config | It returns a copy |
 | An edge `color` that was a CSS color name was ignored | It is used as given |
 | Edge labels could sit on blocks, other edges or each other | A label takes the first free spot: the other side, another segment, or shifted along it |
+| A negative `lane` threw a TypeError | It adds columns before lane 0 |
+| A chain folded back with `fig.rank` could run the wrong way when another stream reached it first | Of the edges that close a loop, the one drawn last runs back, so the flow written first wins |
 
 ### Migration
 
