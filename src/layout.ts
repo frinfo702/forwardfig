@@ -12,6 +12,16 @@ export const values = (n: Node): string[] => JSON.parse(n.attrs.values ?? '[]')
 /** label size of a block: its own fontSize, else derived from the figure's base size */
 export const labelSize = (n: Node, base: number) =>
   +n.attrs.fontSize || (n.shape === 'thin' || n.shape === 'vector' || OUTSIDE.has(n.shape) ? base - 1 : base)
+/**
+ * Linear part [a, b, c, d] of an image's transform (x' = a·x + c·y, y' = b·x + d·y).
+ * tilt: turn around the vertical axis, drawn obliquely (x shrinks, the far side drops);
+ * rotate: in-plane. Both in degrees.
+ */
+export const imageMatrix = (attrs: Record<string, string>): [number, number, number, number] => {
+  const t = ((+attrs.tilt || 0) * Math.PI) / 180, r = ((+attrs.rotate || 0) * Math.PI) / 180
+  const [ta, tb] = [Math.cos(t), Math.sin(t) * 0.35], [cr, sr] = [Math.cos(r), Math.sin(r)]
+  return [cr * ta - sr * tb, sr * ta + cr * tb, -sr, cr]
+}
 export const nums = (s: string | undefined, def: number[]) => (s ? s.split(',').map(Number) : def)
 const REL: Record<string, [number, number]> = { 'left-of': [-1, 0], 'right-of': [1, 0], above: [0, -1], below: [0, 1] }
 const GP = 14 // group padding
@@ -39,7 +49,14 @@ function size(n: Node, horiz: boolean, base: number) {
       ;[w, h] = horiz ? [cw, vals.length * ch + 4] : [vals.length * cw + 4, ch + 2]
       break
     }
-    case 'image': { const [W, H] = nums(n.attrs.size, [64, 64]), k = +n.attrs.n || 1; w = W + (k - 1) * 6; h = H + (k - 1) * 6; break }
+    case 'image': {
+      const [W, H] = nums(n.attrs.size, [64, 64]), k = +n.attrs.n || 1, bw = W + (k - 1) * 6, bh = H + (k - 1) * 6
+      // the layout box is the transformed frame's bounding box
+      const [a, b, c, d] = imageMatrix(n.attrs)
+      w = Math.abs(a) * bw + Math.abs(c) * bh
+      h = Math.abs(b) * bw + Math.abs(d) * bh
+      break
+    }
     case 'gaussian': [w, h] = nums(n.attrs.size, [120, 84]); break
     case 'space': [w, h] = nums(n.attrs.size, [110, 100]); break
     case 'sphere': [w, h] = nums(n.attrs.size, [84, 84]); break

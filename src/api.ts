@@ -67,6 +67,10 @@ export interface ImageOptions extends NodeOptions {
   grid?: number
   /** draw a batch of n frames */
   n?: number
+  /** degrees: turn the image around its vertical axis, drawn obliquely (negative turns the other way) */
+  tilt?: number
+  /** degrees: rotate in-plane */
+  rotate?: number
 }
 export interface GaussianOptions extends NodeOptions {
   /** [x, y, amplitude?, sigma?] in [-1, 1]²; default one centered bump */
@@ -468,6 +472,22 @@ export class Figure {
     const d = this.diagram()
     return render(layout(d), options.theme ?? d.theme, merge(defaults, this.options).materials ?? true)
   }
+  /** Export as svg / png / jpeg / webp. Raster formats need a browser. */
+  async toBlob(options: ExportOptions = {}): Promise<Blob> {
+    const format = options.format ?? 'svg', svg = this.svg({ theme: options.theme })
+    if (format === 'svg') return new Blob([svg], { type: 'image/svg+xml' })
+    if (!['png', 'jpeg', 'webp'].includes(format)) throw new Error(`export: unknown format "${format}" (svg, png, jpeg, webp)`)
+    return rasterize(svg, { ...options, format }, `image/${format}`)
+  }
+  /** Save to a file; the format follows the extension: fig.download('figure.png') */
+  async download(filename = 'figure.svg', options: ExportOptions = {}): Promise<void> {
+    const ext = /\.(\w+)$/.exec(filename)?.[1].toLowerCase()
+    const format = options.format ?? ((ext === 'jpg' ? 'jpeg' : ext) as ExportFormat | undefined) ?? 'svg'
+    const url = URL.createObjectURL(await this.toBlob({ ...options, format }))
+    const a = Object.assign(document.createElement('a'), { href: url, download: filename })
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
   /** Render into an element (or a CSS selector). */
   mount(target: string | Element, options: { theme?: 'light' | 'dark' } = {}): this {
     const el = typeof target === 'string' ? document.querySelector(target) : target
@@ -475,6 +495,53 @@ export class Figure {
     el.innerHTML = this.svg(options)
     return this
   }
+}
+
+export type ExportFormat = 'svg' | 'png' | 'jpeg' | 'webp'
+export interface ExportOptions {
+  /** default: from the file name in download(), else 'svg' */
+  format?: ExportFormat
+  theme?: 'light' | 'dark'
+  /** raster resolution multiplier (default 2) */
+  scale?: number
+  /** raster background; default transparent (white for jpeg, or the theme's background) */
+  background?: string
+  /** jpeg / webp quality 0–1 (default 0.92) */
+  quality?: number
+}
+
+// Raster export draws the SVG as an image, where external URLs don't load: inline them first.
+async function inlineImages(svg: string): Promise<string> {
+  const urls = [...new Set([...svg.matchAll(/<image href="(?!data:)([^"]+)"/g)].map(m => m[1].replace(/&amp;/g, '&')))]
+  for (const url of urls) {
+    try {
+      const blob = await (await fetch(url)).blob()
+      const data = await new Promise<string>((res, rej) => {
+        const r = new FileReader()
+        r.onload = () => res(r.result as string)
+        r.onerror = rej
+        r.readAsDataURL(blob)
+      })
+      svg = svg.split(`href="${url.replace(/&/g, '&amp;')}"`).join(`href="${data}"`)
+    } catch { /* leave it; the browser will show the frame without the picture */ }
+  }
+  return svg
+}
+
+async function rasterize(svg: string, o: ExportOptions, mime: string): Promise<Blob> {
+  if (typeof document === 'undefined') throw new Error(`export: ${o.format} needs a browser (canvas); in Node use svg()`)
+  const [, w, h] = /width="([\d.]+)" height="([\d.]+)"/.exec(svg) ?? []
+  const k = o.scale ?? 2, img = new Image()
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(await inlineImages(svg))
+  await img.decode()
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.ceil(+w * k)
+  canvas.height = Math.ceil(+h * k)
+  const ctx = canvas.getContext('2d')!
+  const bg = o.background ?? (mime === 'image/jpeg' ? '#ffffff' : '')
+  if (bg) { ctx.fillStyle = bg; ctx.fillRect(0, 0, canvas.width, canvas.height) }
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+  return new Promise((res, rej) => canvas.toBlob(b => (b ? res(b) : rej(new Error('export: canvas.toBlob failed'))), mime, o.quality ?? 0.92))
 }
 
 /** Build a figure in one block: figure({ flow: 'BT' }, fig => { ... }) */

@@ -60,7 +60,7 @@ All layers take `(label?, options?)` or `(options?)`.
   - `sphere({ points })`: points on a hypersphere.
   - `pointcloud({ points: [[x, y, z, class?]], shape: 'torus' | 'sphere' | 'cube', n })`: a point cloud. Closer points are drawn larger and darker. When `points` is omitted, they're sampled from `shape`.
 - Signals: `waveform({ samples })`. `samples` takes raw audio in [-1, 1] (`number[]` or `Float32Array`). Long signals are reduced to at most 256 min/max columns, so the SVG stays light. When omitted, a synthetic speech-like waveform is drawn.
-- Images: `image(src, label?, { size, fit: 'cover' | 'contain', grid, n })`. `src` can be a URL, a data URL, an `<img>` or a `<canvas>`. `grid` draws a ViT-style patch grid, and `n` draws a batch of frames.
+- Images: `image(src, label?, { size, fit: 'cover' | 'contain', grid, n, tilt, rotate })`. `src` can be a URL, a data URL, an `<img>` or a `<canvas>`. `grid` draws a ViT-style patch grid, and `n` draws a batch of frames. `tilt` (degrees) turns the image around its vertical axis and draws it obliquely; combined with `n`, it reads as a video volume. `rotate` (degrees) rotates it in-plane. The layout uses the transformed frame's bounding box.
 
 Common options: `color` `texture` `frozen` `train` `crossed` `dashed` `bold` `w` `h` `ghost` `caption` `id`
 
@@ -130,6 +130,18 @@ configure(null)                                                             // r
 - `style` can set `color` `texture` `fontSize` `dashed` `bold`. At the Figure / `configure` level, `fontSize` also sizes edge labels, group titles and captions.
 - A `texture` set through style doesn't override `freeze()` / `train()` (ice and magma win). A texture set on the block itself does.
 - `configure` also takes `theme` `flow` `gap` `materials`.
+
+## Export
+
+```ts
+await fig.download('figure.png')                 // the format follows the extension: .svg .png .jpg/.jpeg .webp
+await fig.download('figure.png', { scale: 3 })   // raster resolution
+const blob = await fig.toBlob({ format: 'webp', quality: 0.9, background: '#fff', theme: 'dark' })
+fig.svg()                                        // string (works in Node too)
+```
+
+- Raster formats (png / jpeg / webp) need a browser (canvas). External image URLs inside are inlined as data URLs before export. JPEG gets a white background by default.
+- PDF isn't supported. For papers, an SVG export (vector) can go into LaTeX via Inkscape or `svg2pdf`.
 
 ## Drawing core
 

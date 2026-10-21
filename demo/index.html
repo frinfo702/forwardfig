@@ -42,6 +42,8 @@
   .bench .out { flex:1; display:flex; align-items:center; justify-content:center; padding:24px; overflow:auto; }
   .bench .status { border-top:1px solid var(--rule); padding:8px 16px; font-size:13px; color:var(--muted); display:flex; justify-content:space-between; gap:12px; }
   .bench .status.err { color:var(--magma); }
+  .bench .saves { display:flex; gap:6px; align-items:center; }
+  .bench .saves button { padding:2px 8px; font-size:12px; }
   .legend { display:flex; gap:16px; flex-wrap:wrap; }
 
   .head { display:flex; justify-content:space-between; align-items:end; gap:16px; flex-wrap:wrap; margin:28px 0 18px; }
@@ -128,7 +130,7 @@ text('$\\mathbf{h}$')(y)
 return fig</textarea>
       <div class="stage">
         <div class="out" id="out" aria-live="polite"></div>
-        <div class="status" id="status"><span class="legend"><span>🧊 frozen</span><span>🔥 trainable</span></span><span id="ms"></span></div>
+        <div class="status" id="status"><span class="legend"><span>🧊 frozen</span><span>🔥 trainable</span></span><span class="saves"><span id="ms"></span> <button type="button" id="play-svg">SVG</button> <button type="button" id="play-png">PNG</button></span></div>
       </div>
     </div>
   </section>
@@ -183,7 +185,7 @@ fig.mount('#figure')</pre>
   <div class="big" id="view-fig"></div>
   <div class="meta">
     <p class="cap" id="view-cap"></p>
-    <div class="actions"><button type="button" id="edit">Edit in playground</button><button type="button" id="copy">Copy source</button><button type="button" id="close" autofocus>Close</button></div>
+    <div class="actions"><button type="button" id="edit">Edit in playground</button><button type="button" id="copy">Copy source</button><button type="button" id="save-svg">SVG</button><button type="button" id="save-png">PNG</button><button type="button" id="close" autofocus>Close</button></div>
     <pre id="view-src"></pre>
   </div>
 </dialog>
@@ -348,6 +350,14 @@ fig.mount('#figure')</pre>
   "cite": "Baevski et al., wav2vec 2.0 (2020)",
   "fig": "Fig. 1",
   "src": "const fig = new Figure({ flow: 'BT' })\nconst frames = s => vector([1, 2, 3, 4, 5].map(i => `$${s}_${i}$`))\n\nconst audio = fig.input(waveform('raw waveform $\\\\mathcal{X}$', { size: [260, 44] }))\nconst z = frames('z')(conv('CNN', { w: 260 })(audio))\n\n// context network over masked latents; quantized targets for the contrastive task\nconst c = frames('c')(block('Transformer', { color: 'orange', w: 260 })(z.edge('masked')))\nconst q = frames('q')(thin('Quantization $\\\\mathcal{Q}$', { texture: 'quantized', color: 'purple' })(z))\nloss('Contrastive loss $\\\\mathcal{L}_m$')(c, q)\nreturn fig"
+ },
+ {
+  "t": "ViViT",
+  "cat": "Vision",
+  "url": "https://arxiv.org/abs/2103.15691",
+  "cite": "Arnab et al., ViViT: A Video Vision Transformer (2021)",
+  "fig": "Fig. 1",
+  "src": "const fig = new Figure({ flow: 'LR' })\n// a clip of frames, tilted into depth like a video volume\nconst clip = fig.input(image(demoImage(), 'Input video', { size: [56, 56], n: 5, tilt: 35, grid: 4 }))\nconst tokens = linear('Tubelet\\nEmbedding')(clip)\nconst sum = op('+')\nconst z = sum(tokens, fig.input('Position\\nEmbedding', { below: sum }))\nconst encoder = block('Transformer\\nEncoder', { color: 'orange', ghost: 3 })\ntext('Class')(mlp('MLP\\nHead')(encoder(z)))\nreturn fig"
  }
 ]</script>
 <script type="module">
@@ -388,7 +398,7 @@ fig.mount('#figure')</pre>
   const svgOf = code => build(code).svg({ theme: theme() })
   const root = document.documentElement
   const FIGS = JSON.parse($('figs').textContent)
-  const COMPONENTS = {"Basic": ["block('Block')", "thin('Thin')", "text('$\\\\mathbf{x}_t$')", "circle('$\\\\mathbf{z}$')", "op('+')", "op('*')", "op('~')", "enc('Encoder')", "dec('Decoder')", "tensor('$\\\\mathbf{X}$', { size: [36, 64, 20] })", "stack('Feature maps', { n: 4 })", "neurons('Layer', { n: 4 })", "vector(['0.22', '0.63', '0.15'])"], "ML presets": ["mha()", "attention()", "ffn()", "mlp()", "norm()", "embed()", "linear()", "softmax()", "matmul()", "concat()", "conv()", "pool()", "act()", "dropout()", "loss()"], "Signals": ["waveform('audio')", "pointcloud('point cloud')", "pointcloud('sphere', { shape: 'sphere' })", "pointcloud('cube', { shape: 'cube', n: 300 })"], "3D": ["gaussian('$p(\\\\mathbf{z})$')", "gaussian('mixture', { peaks: [[-0.45, -0.2, 1, 0.3], [0.5, 0.35, 0.7, 0.28]] })", "space('latent', { points: samplePoints })", "sphere('$\\\\mathbb{S}^2$', { points: samplePoints })"], "Images": ["image(demoImage(), 'image')", "image(demoImage(), 'patches', { grid: 4 })", "image(demoImage(), 'batch', { n: 3 })", "image(demoImage(0.6), 'noisy')"]}
+  const COMPONENTS = {"Basic": ["block('Block')", "thin('Thin')", "text('$\\\\mathbf{x}_t$')", "circle('$\\\\mathbf{z}$')", "op('+')", "op('*')", "op('~')", "enc('Encoder')", "dec('Decoder')", "tensor('$\\\\mathbf{X}$', { size: [36, 64, 20] })", "stack('Feature maps', { n: 4 })", "neurons('Layer', { n: 4 })", "vector(['0.22', '0.63', '0.15'])"], "ML presets": ["mha()", "attention()", "ffn()", "mlp()", "norm()", "embed()", "linear()", "softmax()", "matmul()", "concat()", "conv()", "pool()", "act()", "dropout()", "loss()"], "Signals": ["waveform('audio')", "pointcloud('point cloud')", "pointcloud('sphere', { shape: 'sphere' })", "pointcloud('cube', { shape: 'cube', n: 300 })"], "3D": ["gaussian('$p(\\\\mathbf{z})$')", "gaussian('mixture', { peaks: [[-0.45, -0.2, 1, 0.3], [0.5, 0.35, 0.7, 0.28]] })", "space('latent', { points: samplePoints })", "sphere('$\\\\mathbb{S}^2$', { points: samplePoints })"], "Images": ["image(demoImage(), 'image')", "image(demoImage(), 'patches', { grid: 4 })", "image(demoImage(), 'batch', { n: 3 })", "image(demoImage(0.6), 'noisy')", "image(demoImage(), 'tilted', { tilt: 35 })", "image(demoImage(), 'frames', { n: 4, tilt: 35 })", "image(demoImage(), 'rotated', { rotate: -12 })"]}
   // a few labelled 3D points for the space / sphere samples
   const samplePoints = Array.from({ length: 30 }, (_, i) => {
     const c = i % 3, a = c * 2.1 + Math.sin(i * 7.1) * 0.3, b = 0.35 + Math.cos(i * 3.7) * 0.3
@@ -429,6 +439,12 @@ fig.mount('#figure')</pre>
   $('copy').onclick = async () => {
     try { await navigator.clipboard.writeText(FIGS[open].src); $('copy').textContent = 'Copied' } catch { $('copy').textContent = 'Copy failed' }
   }
+  const slug = t => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  const save = (code, name, ext) => build(code).download(`${name}.${ext}`, { theme: theme() }).catch(e => alert(e.message))
+  $('save-svg').onclick = () => save(FIGS[open].src, slug(FIGS[open].t), 'svg')
+  $('save-png').onclick = () => save(FIGS[open].src, slug(FIGS[open].t), 'png')
+  $('play-svg').onclick = () => save($('src').value, 'figure', 'svg')
+  $('play-png').onclick = () => save($('src').value, 'figure', 'png')
   $('edit').onclick = () => { $('src').value = FIGS[open].src; $('view').close(); draw(); $('src').focus(); scrollTo({ top: 0 }) }
 
   // playground

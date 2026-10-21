@@ -285,3 +285,27 @@ test('pointcloud and waveform', () => {
   expect(svg).not.toContain('NaN')
   expect(svg.length).toBeLessThan(60000) // 16k samples don't leak into the SVG
 })
+
+test('tilted / rotated images: layout box grows to the transformed frame', () => {
+  const box = (o: object) => {
+    const d = layout(figure({}, fig => { fig.input(image('data:image/png;base64,AA==', { size: [60, 40], ...o })) }).diagram())
+    return [...d.nodes.values()][0]
+  }
+  const flat = box({}), tilted = box({ tilt: 40 }), turned = box({ rotate: 90 })
+  expect(flat).toMatchObject({ w: 60, h: 40 })
+  expect(tilted.w).toBeCloseTo(60 * Math.cos(40 * Math.PI / 180), 1)
+  expect(tilted.h).toBeGreaterThan(40)
+  expect(turned.w).toBeCloseTo(40, 1)
+  expect(turned.h).toBeCloseTo(60, 1)
+  const svg = figure({}, fig => { fig.input(image('data:image/png;base64,AA==', { tilt: 30, n: 3 })) }).svg()
+  expect(svg).toMatch(/transform="matrix\(0\.8660 0\.1750 0\.0000 1\.0000 /)
+})
+
+test('export: svg blob anywhere; raster formats need a browser', async () => {
+  const fig = figure({}, f => { block('a')(f.input('x')) })
+  const blob = await fig.toBlob()
+  expect(blob.type).toBe('image/svg+xml')
+  expect(await blob.text()).toStartWith('<svg')
+  await expect(fig.toBlob({ format: 'png' })).rejects.toThrow('needs a browser')
+  await expect(fig.toBlob({ format: 'pdf' as never })).rejects.toThrow('unknown format')
+})

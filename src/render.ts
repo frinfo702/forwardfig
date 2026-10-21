@@ -1,5 +1,5 @@
 import type { Diagram, Edge, Group, Node } from './types'
-import { FS, OUTSIDE, labelSize, nums, values } from './layout'
+import { FS, OUTSIDE, imageMatrix, labelSize, nums, values } from './layout'
 import { bake, type Material } from './materials'
 import { SANS, SERIF, layoutLabel } from './tex'
 
@@ -312,8 +312,10 @@ export function render(d: Diagram, theme?: string, materials = true): string {
       case 'image': {
         const [W, H] = nums(n.attrs.size, [64, 64]), k = +n.attrs.n || 1, gn = +n.attrs.grid || 0
         const fit = n.attrs.fit === 'contain' ? 'xMidYMid meet' : 'xMidYMid slice'
+        // draw the untransformed frame around the center, then tilt / rotate it there
+        const x0 = n.x - (W + (k - 1) * 6) / 2, y0 = n.y - (H + (k - 1) * 6) / 2
         for (let i = 0; i < k; i++) {
-          const x = L + i * 6, y = T + i * 6, d = rr(x, y, W, H, 3)
+          const x = x0 + i * 6, y = y0 + i * 6, d = rr(x, y, W, H, 3)
           if (i < k - 1) { o += `<path d="${d}" fill="${th.dark ? '#1b2029' : '#fff'}" stroke="${stroke}"/>`; continue }
           const id = `${P}k${clips++}`
           o += `<clipPath id="${id}"><path d="${d}"/></clipPath>` +
@@ -325,6 +327,10 @@ export function render(d: Diagram, theme?: string, materials = true): string {
           }
           o += `<path d="${d}" fill="none" stroke="${stroke}"/>`
         }
+        const [a, b, c, dd] = imageMatrix(n.attrs)
+        if (a !== 1 || b !== 0 || c !== 0 || dd !== 1)
+          // coefficients keep 4 decimals; the template's 0.1px rounding is for coordinates
+          o = s`<g transform="matrix(${[a, b, c, dd].map(v => v.toFixed(4)).join(' ')} ${n.x - a * n.x - c * n.y} ${n.y - b * n.x - dd * n.y})">` + o + '</g>'
         box(L, T, n.w, n.h)
         break
       }
