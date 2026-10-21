@@ -132,7 +132,7 @@ return fig</textarea>
 
   <section class="textures" aria-labelledby="tex-h">
     <div class="head"><h2 id="tex-h">Textures</h2></div>
-    <p class="lede">Set <code>texture</code> on any block, or on a module for its group box. <code>freeze()</code> and <code>train()</code> give ice and magma and add the badge; the other textures leave the badge to them.</p>
+    <p class="lede">Set <code>texture</code> on any block, or on a module for its group box. <code>freeze()</code> and <code>train()</code> give ice and magma and add the badge; the other textures leave the badge to them. <code>crossed: true</code> strikes out a block, or an edge with <code>x.edge({ crossed: true })</code>.</p>
     <ul class="swatches" id="swatches"></ul>
   </section>
 
@@ -159,7 +159,7 @@ new EncoderLayer({ repeat: 'N×' }).freeze()(fig.input('$x$'))
 fig.mount('#figure')</pre>
   </section>
 
-  <footer>Every figure here is a redrawing made for this page. Follow the citation under each one for the original. Sample images are generated on the page.</footer>
+  <footer>Every figure here is a redrawing made for this page. Follow the citation under each one for the original. Sample photo by <a href="https://unsplash.com/@allancox">Allan Cox</a> on Unsplash.</footer>
 </div>
 
 <dialog id="view" aria-labelledby="view-cap">
@@ -202,7 +202,7 @@ fig.mount('#figure')</pre>
   "url": "https://arxiv.org/abs/2010.11929",
   "cite": "Dosovitskiy et al., An Image is Worth 16x16 Words (2021)",
   "fig": "Fig. 1",
-  "src": "const fig = new Figure({ flow: 'LR' })\n// a real image as a block; demoImage() returns a <canvas>, any URL works too\nconst img = fig.input(image(demoImage('photo'), 'Image', { size: [56, 56], grid: 4 }))\nconst patches = stack('Patches', { n: 6, size: [16, 16], offset: 5 })(img)\nconst tokens = linear('Linear Projection\\nof Flattened Patches')(patches)\n\nconst sum = op('+')\nconst z = sum(tokens,\n  fig.input('Position\\nEmbedding', { below: sum }),\n  fig.input('[class]\\ntoken', { above: sum }))\nconst encoder = block('Transformer\\nEncoder', { color: 'orange', ghost: 3 })\ntext('Class')(mlp('MLP\\nHead')(encoder(z)))\nreturn fig"
+  "src": "const fig = new Figure({ flow: 'LR' })\n// a real image as a block; demoImage() returns a <canvas>, a URL or <img> works too\nconst img = fig.input(image(demoImage(), 'Image', { size: [56, 56], grid: 4 }))\nconst patches = stack('Patches', { n: 6, size: [16, 16], offset: 5 })(img)\nconst tokens = linear('Linear Projection\\nof Flattened Patches')(patches)\n\nconst sum = op('+')\nconst z = sum(tokens,\n  fig.input('Position\\nEmbedding', { below: sum }),\n  fig.input('[class]\\ntoken', { above: sum }))\nconst encoder = block('Transformer\\nEncoder', { color: 'orange', ghost: 3 })\ntext('Class')(mlp('MLP\\nHead')(encoder(z)))\nreturn fig"
  },
  {
   "t": "Mixture of Experts",
@@ -218,7 +218,7 @@ fig.mount('#figure')</pre>
   "url": "http://yann.lecun.com/exdb/publis/pdf/lecun-98.pdf",
   "cite": "LeCun et al., Gradient-Based Learning Applied to Document Recognition (1998)",
   "fig": "Fig. 2",
-  "src": "const fig = new Figure({ flow: 'LR' })\nlet x = fig.input(image(demoImage('digit'), 'Input', { size: [56, 56] }))\nx = stack('Feature maps', { n: 4, size: [52, 52] })(x.edge('Convolutions'))\nx = stack('f.maps', { n: 4, size: [30, 30] })(x.edge('Subsampling'))\nx = stack('f.maps', { n: 8, size: [24, 24], offset: 4 })(x.edge('Convolutions'))\nx = stack({ n: 8, size: [14, 14], offset: 4 })(x.edge('Subsampling'))\nconst fc = neurons('FC', { n: 5 })(x)\nneurons('Output', { n: 3, color: 'purple' })(fc.edge({ dense: true }))\nreturn fig"
+  "src": "const fig = new Figure({ flow: 'LR' })\nlet x = fig.input(image(demoImage(), 'Input', { size: [56, 56] }))\nx = stack('Feature maps', { n: 4, size: [52, 52] })(x.edge('Convolutions'))\nx = stack('f.maps', { n: 4, size: [30, 30] })(x.edge('Subsampling'))\nx = stack('f.maps', { n: 8, size: [24, 24], offset: 4 })(x.edge('Convolutions'))\nx = stack({ n: 8, size: [14, 14], offset: 4 })(x.edge('Subsampling'))\nconst fc = neurons('FC', { n: 5 })(x)\nneurons('Output', { n: 3, color: 'purple' })(fc.edge({ dense: true }))\nreturn fig"
  },
  {
   "t": "Residual Block",
@@ -242,7 +242,7 @@ fig.mount('#figure')</pre>
   "url": "https://arxiv.org/abs/2006.11239",
   "cite": "Ho et al., Denoising Diffusion Probabilistic Models (2020)",
   "fig": "Fig. 2",
-  "src": "const fig = new Figure({ flow: 'LR' })\nconst xT = circle('$\\\\mathbf{x}_T$', { color: 'gray' })\nconst xt = circle('$\\\\mathbf{x}_t$', { color: 'gray' })\nconst xt1 = circle('$\\\\mathbf{x}_{t-1}$', { color: 'gray' })\nconst x0 = circle('$\\\\mathbf{x}_0$')\nconst dots = () => text('$\\\\cdots$')\n\nlet h = dots()(fig.input(xT))\nh = xt1(xt(h).edge('$p_\\\\theta(\\\\mathbf{x}_{t-1}|\\\\mathbf{x}_t)$'))\nx0(dots()(h))\nfig.edge(h, xt, { label: '$q(\\\\mathbf{x}_t|\\\\mathbf{x}_{t-1})$', dashed: true, curve: true })\n\n// samples at each step\nfor (const [state, noise] of [[xT, 1], [x0, 0]])\n  fig.input(image(demoImage('digit', noise), { size: [40, 40], below: state, dist: 10 }))\nreturn fig"
+  "src": "const fig = new Figure({ flow: 'LR' })\nconst xT = circle('$\\\\mathbf{x}_T$', { color: 'gray' })\nconst xt = circle('$\\\\mathbf{x}_t$', { color: 'gray' })\nconst xt1 = circle('$\\\\mathbf{x}_{t-1}$', { color: 'gray' })\nconst x0 = circle('$\\\\mathbf{x}_0$')\nconst dots = () => text('$\\\\cdots$')\n\nlet h = dots()(fig.input(xT))\nh = xt1(xt(h).edge('$p_\\\\theta(\\\\mathbf{x}_{t-1}|\\\\mathbf{x}_t)$'))\nx0(dots()(h))\nfig.edge(h, xt, { label: '$q(\\\\mathbf{x}_t|\\\\mathbf{x}_{t-1})$', dashed: true, curve: true })\n\n// samples at each step\nfor (const [state, noise] of [[xT, 1], [x0, 0]])\n  fig.input(image(demoImage(noise), { size: [40, 40], below: state, dist: 10 }))\nreturn fig"
  },
  {
   "t": "Variational Autoencoder",
@@ -258,7 +258,7 @@ fig.mount('#figure')</pre>
   "url": "https://arxiv.org/abs/1406.2661",
   "cite": "Goodfellow et al., Generative Adversarial Nets (2014)",
   "fig": "",
-  "src": "const fig = new Figure({ flow: 'LR' })\nconst G = block('Generator $G$').train()\nconst D = block('Discriminator $D$').train()\n\nconst fake = circle('$G(\\\\mathbf{z})$', { color: 'pink' })(G(fig.input('$\\\\mathbf{z}\\\\sim p_\\\\mathbf{z}$')))\nconst real = fig.input(image(demoImage('digit'), { size: [40, 40], caption: '$\\\\mathbf{x}\\\\sim p_\\\\text{data}$' }))\ntext('real / fake')(D(fake, real))\nreturn fig"
+  "src": "const fig = new Figure({ flow: 'LR' })\nconst G = block('Generator $G$').train()\nconst D = block('Discriminator $D$').train()\n\nconst fake = circle('$G(\\\\mathbf{z})$', { color: 'pink' })(G(fig.input('$\\\\mathbf{z}\\\\sim p_\\\\mathbf{z}$')))\nconst real = fig.input(image(demoImage(), { size: [40, 40], caption: '$\\\\mathbf{x}\\\\sim p_\\\\text{data}$' }))\ntext('real / fake')(D(fake, real))\nreturn fig"
  },
  {
   "t": "Normalizing Flow",
@@ -274,7 +274,7 @@ fig.mount('#figure')</pre>
   "url": "https://arxiv.org/abs/2103.00020",
   "cite": "Radford et al., Learning Transferable Visual Models (2021)",
   "fig": "Fig. 1",
-  "src": "const fig = new Figure({ flow: 'LR' })\nconst embeddings = (s, color) => vector([`$${s}_1$`, `$${s}_2$`, '$\\\\cdots$', `$${s}_N$`], { color })\n\nconst textEnc = enc('Text\\nEncoder', { color: 'purple' })\nconst imageEnc = enc('Image\\nEncoder', { color: 'green' })\nconst T = embeddings('T', 'purple')(textEnc(fig.input('\"Pepper the\\naussie pup\"')))\nconst I = embeddings('I', 'green')(imageEnc(fig.input(image(demoImage('photo'), { size: [52, 52] }))))\nblock('$I_i\\\\cdot T_j$\\ncontrastive', { color: 'yellow' })(T, I)\nreturn fig"
+  "src": "const fig = new Figure({ flow: 'LR' })\nconst embeddings = (s, color) => vector([`$${s}_1$`, `$${s}_2$`, '$\\\\cdots$', `$${s}_N$`], { color })\n\nconst textEnc = enc('Text\\nEncoder', { color: 'purple' })\nconst imageEnc = enc('Image\\nEncoder', { color: 'green' })\nconst T = embeddings('T', 'purple')(textEnc(fig.input('\"a robin on\\na bench\"')))\nconst I = embeddings('I', 'green')(imageEnc(fig.input(image(demoImage(), { size: [52, 52] }))))\nblock('$I_i\\\\cdot T_j$\\ncontrastive', { color: 'yellow' })(T, I)\nreturn fig"
  },
  {
   "t": "Contrastive Learning on the Hypersphere",
@@ -282,7 +282,7 @@ fig.mount('#figure')</pre>
   "url": "https://arxiv.org/abs/2005.10242",
   "cite": "Wang & Isola, Alignment and Uniformity on the Hypersphere (2020)",
   "fig": "",
-  "src": "const fig = new Figure({ flow: 'LR' })\n// one encoder called on both views: shared weights, one block\nconst f = enc('Encoder $f$').train()\nconst view = noise => fig.input(image(demoImage('photo', noise), { size: [44, 44] }))\nconst h = thin('normalize')(f(view(0), view(0.35)))\n\nconst points = Array.from({ length: 36 }, (_, i) => {\n  const c = i % 3, a = c * 2.1 + Math.sin(i * 7.1) * 0.25, b = 0.4 + Math.cos(i * 3.7) * 0.25\n  return [Math.cos(a) * Math.cos(b), Math.sin(a) * Math.cos(b), Math.sin(b) * (c - 1), c]\n})\nsphere('$\\\\mathbb{S}^{d-1}$', { points, size: [112, 112] })(h)\nreturn fig"
+  "src": "const fig = new Figure({ flow: 'LR' })\n// one encoder called on both views: shared weights, one block\nconst f = enc('Encoder $f$').train()\nconst view = noise => fig.input(image(demoImage(noise), { size: [44, 44] }))\nconst h = thin('normalize')(f(view(0), view(0.35)))\n\nconst points = Array.from({ length: 36 }, (_, i) => {\n  const c = i % 3, a = c * 2.1 + Math.sin(i * 7.1) * 0.25, b = 0.4 + Math.cos(i * 3.7) * 0.25\n  return [Math.cos(a) * Math.cos(b), Math.sin(a) * Math.cos(b), Math.sin(b) * (c - 1), c]\n})\nsphere('$\\\\mathbb{S}^{d-1}$', { points, size: [112, 112] })(h)\nreturn fig"
  },
  {
   "t": "LoRA",
@@ -298,7 +298,7 @@ fig.mount('#figure')</pre>
   "url": "https://arxiv.org/abs/2304.08485",
   "cite": "Liu et al., Visual Instruction Tuning (2023)",
   "fig": "Fig. 1, stage 1 (feature alignment)",
-  "src": "const fig = new Figure({ flow: 'BT' })\nconst tokens = (name, color) => vector([`$\\\\mathbf{${name[0]}}_\\\\text{${name[1]}}$`, '', '', ''], { color })\n\nconst img = fig.input(image(demoImage('photo'), { size: [64, 48], caption: 'Image $\\\\mathbf{X}_\\\\text{v}$' }))\nconst instruction = fig.input('Language Instruction $\\\\mathbf{X}_\\\\text{q}$')\n\nconst Zv = tokens('Zv', 'gray')(enc('Vision Encoder', { w: 150 }).freeze()(img))\nconst Hv = tokens('Hv', 'orange')(thin('Projection $\\\\mathbf{W}$').train()(Zv))\nconst Hq = tokens('Hq', 'blue')(instruction)\nfig.rank(Hv, Hq)\n\nconst llm = block('Language Model $f_\\\\phi$', { w: 330, h: 56, lane: 0.5 }).freeze()\ntext('Language Response $\\\\mathbf{X}_\\\\text{a}$', { lane: 0.5 })(llm(Hv, Hq))\nreturn fig"
+  "src": "const fig = new Figure({ flow: 'BT' })\nconst tokens = (name, color) => vector([`$\\\\mathbf{${name[0]}}_\\\\text{${name[1]}}$`, '', '', ''], { color })\n\nconst img = fig.input(image(demoImage(), { size: [64, 48], caption: 'Image $\\\\mathbf{X}_\\\\text{v}$' }))\nconst instruction = fig.input('Language Instruction $\\\\mathbf{X}_\\\\text{q}$')\n\nconst Zv = tokens('Zv', 'gray')(enc('Vision Encoder', { w: 150 }).freeze()(img))\nconst Hv = tokens('Hv', 'orange')(thin('Projection $\\\\mathbf{W}$').train()(Zv))\nconst Hq = tokens('Hq', 'blue')(instruction)\nfig.rank(Hv, Hq)\n\nconst llm = block('Language Model $f_\\\\phi$', { w: 330, h: 56, lane: 0.5 }).freeze()\ntext('Language Response $\\\\mathbf{X}_\\\\text{a}$', { lane: 0.5 })(llm(Hv, Hq))\nreturn fig"
  },
  {
   "t": "QLoRA",
@@ -321,23 +321,16 @@ fig.mount('#figure')</pre>
   import mm from '../dist/machine-mermaid.js'
   const $ = id => document.getElementById(id)
 
-  // Sample images for the figures, drawn on a canvas: a digit or a small landscape, plus Gaussian noise.
-  function demoImage(kind = 'photo', noise = 0, size = 64) {
+  // The sample image for the figures (photo: Allan Cox, Unsplash), cropped square,
+  // optionally with Gaussian noise mixed in.
+  const robin = new Image()
+  robin.src = 'assets/robin.jpg'
+  await robin.decode()
+  function demoImage(noise = 0, size = 96) {
     const c = document.createElement('canvas')
     c.width = c.height = size
-    const g = c.getContext('2d')
-    if (kind === 'digit') {
-      g.fillStyle = '#000'; g.fillRect(0, 0, size, size)
-      g.fillStyle = '#fff'; g.font = `700 ${size * 0.78}px Georgia, serif`; g.textAlign = 'center'; g.textBaseline = 'middle'
-      g.fillText('3', size / 2, size * 0.56)
-    } else {
-      const sky = g.createLinearGradient(0, 0, 0, size)
-      sky.addColorStop(0, '#5aa7e8'); sky.addColorStop(1, '#f6d6a8')
-      g.fillStyle = sky; g.fillRect(0, 0, size, size)
-      g.fillStyle = '#fff3c4'; g.beginPath(); g.arc(size * 0.7, size * 0.32, size * 0.11, 0, 7); g.fill()
-      g.fillStyle = '#5c8f5a'; g.beginPath(); g.moveTo(0, size * 0.72); g.quadraticCurveTo(size * 0.35, size * 0.48, size, size * 0.7); g.lineTo(size, size); g.lineTo(0, size); g.fill()
-      g.fillStyle = '#3f6e46'; g.beginPath(); g.moveTo(0, size * 0.86); g.quadraticCurveTo(size * 0.6, size * 0.66, size, size * 0.9); g.lineTo(size, size); g.lineTo(0, size); g.fill()
-    }
+    const g = c.getContext('2d'), k = Math.min(robin.width, robin.height)
+    g.drawImage(robin, (robin.width - k) / 2, (robin.height - k) / 2, k, k, 0, 0, size, size)
     if (noise) {
       const im = g.getImageData(0, 0, size, size), d = im.data
       let s = 7
@@ -362,7 +355,8 @@ fig.mount('#figure')</pre>
   const root = document.documentElement
   const FIGS = JSON.parse($('figs').textContent)
   const TEXTURES = [['ice', 'frozen weights'], ['magma', 'trainable weights'], ['glass', 'soft prompts, adapters'], ['metal', 'fixed ops, hardware'],
-    ['noise', 'noise injection, diffusion'], ['quantized', 'low-bit weights'], ['sparse', 'pruned weights'], ['hatch', 'masked, stop-gradient']]
+    ['noise', 'noise injection, diffusion'], ['quantized', 'low-bit weights'], ['sparse', 'pruned weights'], ['hatch', 'masked, stop-gradient'],
+    ['crossed', 'removed, ablated']]
   const theme = () => root.dataset.theme ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
   const caption = (f, i) => `<b>Figure ${i + 1}.</b> ${f.t}. <span><a href="${f.url}">${f.cite}</a>${f.fig ? `, ${f.fig}` : ''}.</span>`
 
@@ -416,7 +410,7 @@ fig.mount('#figure')</pre>
     }
     $('swatches').innerHTML = TEXTURES.map(([t, use]) => {
       const f = new mm.Figure({ theme: theme() })
-      f.input(mm.block(t, { texture: t, w: 150, h: 60 }))
+      f.input(mm.block(t, t === 'crossed' ? { crossed: true, w: 150, h: 60 } : { texture: t, w: 150, h: 60 }))
       return `<li>${f.svg()}<p><b>${t}</b> ${use}</p></li>`
     }).join('')
     if ($('view').open) show(open)

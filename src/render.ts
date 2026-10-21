@@ -393,7 +393,17 @@ export function render(d: Diagram, theme?: string, materials = true): string {
       const round = n.shape === 'op' || n.shape === 'var'
       o += round ? badge(b, n.x + n.w * 0.36, n.y - n.h * 0.36) : badge(b, L + n.w - 2, T + 2)
     }
+    if (n.flags.has('crossed')) {
+      // dim the block and strike it through; round shapes get the ✕ inside the circle
+      const k = n.shape === 'op' || n.shape === 'var' ? n.w * 0.15 : 3
+      o = `<g opacity=".5">${o}</g>` + cross(L + k, T + k, L + n.w - k, T + n.h - k, 2.2)
+    }
     return `<g>${o}</g>`
+  }
+  // ✕ from (x0,y0) to (x1,y1), with a halo so it reads on any fill
+  const cross = (x0: number, y0: number, x1: number, y1: number, w: number) => {
+    const d = s`M${x0},${y0}L${x1},${y1}M${x1},${y0}L${x0},${y1}`, c = th.c.red[1]
+    return `<path d="${d}" stroke="${th.halo}" stroke-width="${w + 2.5}" stroke-linecap="round"/><path d="${d}" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/>`
   }
   const d_rl = () => d.dir === 'RL', d_bt = () => d.dir === 'BT'
 
@@ -432,6 +442,16 @@ export function render(d: Diagram, theme?: string, materials = true): string {
         d += s`L${b[0] + (a[0] - b[0]) * r / (l1 || 1)},${b[1] + (a[1] - b[1]) * r / (l1 || 1)}Q${b[0]},${b[1]} ${b[0] + (c[0] - b[0]) * r / (l2 || 1)},${b[1] + (c[1] - b[1]) * r / (l2 || 1)}`
       }
       d += s`L${p[p.length - 1][0]},${p[p.length - 1][1]}`
+    }
+    if (e.flags.has('crossed')) {
+      // ✕ at the middle of the longest segment
+      let bi = 0, best = -1
+      for (let i = 0; i + 1 < e.pts.length; i++) {
+        const l = Math.hypot(e.pts[i + 1][0] - e.pts[i][0], e.pts[i + 1][1] - e.pts[i][1])
+        if (l > best) { best = l; bi = i }
+      }
+      const mx = (e.pts[bi][0] + e.pts[bi + 1][0]) / 2, my = (e.pts[bi][1] + e.pts[bi + 1][1]) / 2
+      o += cross(mx - 5, my - 5, mx + 5, my + 5, 2)
     }
     return s`<path d="${d}" fill="none" stroke="${color}" stroke-width="${thick ? 2.2 : 1.4}" stroke-linecap="round" stroke-linejoin="round"${dashed ? ' stroke-dasharray="5 4"' : ''}/>` + o
   }

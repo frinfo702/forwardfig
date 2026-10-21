@@ -130,3 +130,15 @@ test('textures and the neutral default color', () => {
   expect(svg).toContain('#e2e5e9')
   expect(svg).not.toContain('NaN')
 })
+
+test('crossed blocks and edges get a ✕', () => {
+  const d = figure({}, fig => {
+    const x = fig.input('x')
+    block('gone', { crossed: true })(x.edge({ crossed: true }))
+  }).diagram()
+  expect([...d.nodes.values()][1].flags.has('crossed')).toBe(true)
+  expect(d.edges[0].flags.has('crossed')).toBe(true)
+  const svg = figure({}, fig => { block('gone', { crossed: true })(fig.input('x').edge({ crossed: true })) }).svg()
+  expect(svg.match(/stroke="#dd6559"/g)?.length).toBe(2)
+  expect(svg).toContain('opacity=".5"')
+})

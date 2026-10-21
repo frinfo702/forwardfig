@@ -32,6 +32,8 @@ export interface NodeOptions {
   texture?: Texture
   dashed?: boolean
   bold?: boolean
+  /** a ✕ over the block: removed, ablated, dropped */
+  crossed?: boolean
   w?: number
   h?: number
   /** stacked copies behind the block, e.g. heads of multi-head attention */
@@ -95,6 +97,8 @@ export interface EdgeOptions {
   curve?: boolean
   side?: 'left' | 'right' | 'top' | 'bottom'
   color?: string
+  /** a ✕ on the edge: a cut connection */
+  crossed?: boolean
 }
 
 // --- tensors and the trace graph
@@ -293,7 +297,7 @@ export interface FigureOptions {
   materials?: boolean
 }
 
-const SKIP = new Set(['id', 'color', 'frozen', 'train', 'dashed', 'bold'])
+const SKIP = new Set(['id', 'color', 'frozen', 'train', 'dashed', 'bold', 'crossed'])
 const KEY: Record<string, string> = { leftOf: 'left-of', rightOf: 'right-of' }
 
 export class Figure {
@@ -324,7 +328,7 @@ export class Figure {
       const o = L.options as Record<string, unknown> & NodeOptions
       const inherited = [...r.mods].reverse().map(m => m.options).find(m => m.frozen || m.train)
       const fx = o.frozen ? 'frozen' : o.train ? 'train' : inherited?.frozen ? 'frozen' : inherited?.train ? 'train' : ''
-      const flags = new Set([fx, o.dashed && 'dashed', o.bold && 'bold'].filter((f): f is string => !!f))
+      const flags = new Set([fx, o.dashed && 'dashed', o.bold && 'bold', o.crossed && 'crossed'].filter((f): f is string => !!f))
       const attrs: Record<string, string> = {}
       for (const [k, v] of Object.entries(o)) {
         if (SKIP.has(k) || v === undefined) continue
@@ -340,7 +344,7 @@ export class Figure {
     const edges: Edge[] = g.edges.map(({ from, to, style: s }) => ({
       from, to: g.id(to), label: s.label, pts: [],
       op: s.dense ? '=>' : s.arrow === 'none' ? (s.dashed ? '..' : '--') : s.arrow === 'both' ? '<->' : s.dashed ? '..>' : '->',
-      flags: new Set((['skip', 'curve', 'thick', 'dashed'] as const).filter(k => s[k])),
+      flags: new Set((['skip', 'curve', 'thick', 'dashed', 'crossed'] as const).filter(k => s[k])),
       attrs: { ...(s.side && { side: s.side }), ...(s.color && { color: s.color }) },
     }))
     return {

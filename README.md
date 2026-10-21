@@ -60,9 +60,10 @@ All layers take `(label?, options?)` or `(options?)`.
   - `sphere({ points })`: points on a hypersphere.
 - Images: `image(src, label?, { size, fit: 'cover' | 'contain', grid, n })`. `src` can be a URL, a data URL, an `<img>` or a `<canvas>`. `grid` draws a ViT-style patch grid, and `n` draws a batch of frames.
 
-Common options: `color` `texture` `frozen` `train` `dashed` `bold` `w` `h` `ghost` `caption` `id`
+Common options: `color` `texture` `frozen` `train` `crossed` `dashed` `bold` `w` `h` `ghost` `caption` `id`
 
 - `color`: a palette name (`pink orange yellow green blue purple teal red gray white`) or `#hex`. If it's omitted, the block is a neutral grey that reads on both light and dark pages.
+- `crossed: true` dims the block and lays a red ✕ over it, for removed or ablated parts. On an edge it puts a ✕ in the middle, for a cut connection.
 - `texture` sets a block's surface. Set it on a module to style its group box.
 
   | texture | Look | Example use |
@@ -82,7 +83,7 @@ Common options: `color` `texture` `frozen` `train` `dashed` `bold` `w` `h` `ghos
 - `freeze()` / `train()` can be called on a layer or on a module. On a module they apply to every block inside it, unless a layer is marked explicitly.
 - A 🧊 or 🔥 in a label works the same way.
 
-Edges (`x.edge({...})` / `fig.edge(a, b, {...})`): `label` `dashed` `arrow: 'end' | 'both' | 'none'` `thick` `dense` (fully connected between `neurons`) `skip` `curve` `side` `color`
+Edges (`x.edge({...})` / `fig.edge(a, b, {...})`): `label` `crossed` `dashed` `arrow: 'end' | 'both' | 'none'` `thick` `dense` (fully connected between `neurons`) `skip` `curve` `side` `color`
 
 Labels: a newline (`\n`) starts a new line, and `$...$` is TeX. Supported: `^ _ \mathbf \mathrm \text \boldsymbol \mathcal \mathbb`, Greek letters, common symbols, `\hat \tilde \bar \vec`, and `\frac` (rendered as a/b).
 
