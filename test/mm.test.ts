@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { Figure, Module, Tensor, add, conv, ffn, figure, gaussian, image, mha, norm, op, space, sphere, text, thin, block, act, preset, configure, type Layer } from '../src/index'
+import { Figure, Module, Tensor, add, conv, ffn, figure, gaussian, image, mha, norm, op, space, sphere, text, thin, block, act, preset, configure, pointcloud, waveform, type Layer } from '../src/index'
 import { layout } from '../src/layout'
 import { layoutLabel } from '../src/tex'
 
@@ -267,4 +267,21 @@ test('repeatSide: explicit sides, and auto avoids what is in the way', () => {
   // auto: the arrow from x enters on the left at mid-height, so auto must not sit there
   const [ax, ay] = repeatXY(draw().svg)
   expect(ax < g.x && Math.abs(ay - (g.y + g.h / 2)) < 8).toBe(false)
+})
+
+test('pointcloud and waveform', () => {
+  const audio = Float32Array.from({ length: 16000 }, (_, i) => Math.sin(i / 20) * (i % 4000) / 4000)
+  const w = waveform('speech', { samples: audio })
+  const cols = JSON.parse(JSON.stringify((w.options as { wave: number[][] }).wave))
+  expect(cols.length).toBe(256)
+  expect(cols.every(([lo, hi]: number[]) => lo <= hi && lo >= -1 && hi <= 1)).toBe(true)
+  const svg = figure({ flow: 'LR' }, fig => {
+    const x = fig.input(w)
+    pointcloud('cloud', { shape: 'sphere', n: 50 })(x)
+    pointcloud('labelled', { points: [[0, 0, 0, 1], [0.5, 0.5, 0.5, 2]] })(x)
+    waveform()(x)
+  }).svg()
+  expect(svg.match(/<circle /g)!.length).toBeGreaterThanOrEqual(52)
+  expect(svg).not.toContain('NaN')
+  expect(svg.length).toBeLessThan(60000) // 16k samples don't leak into the SVG
 })

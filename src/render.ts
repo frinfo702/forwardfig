@@ -61,6 +61,26 @@ const fitTo = (pts: number[][], L: number, T: number, w: number, h: number, pad:
   const ox = L + w / 2 - ((x0 + x1) / 2) * k, oy = T + h / 2 - ((y0 + y1) / 2) * k
   return (p: number[]) => [ox + p[0] * k, oy + p[1] * k]
 }
+// low-discrepancy (R2) sequence: even, deterministic sampling without Math.random
+const r2 = (i: number): [number, number] => [(0.5 + i * 0.7548776662) % 1, (0.5 + i * 0.5698402910) % 1]
+const cloud = (shape: string, n: number): number[][] =>
+  Array.from({ length: n }, (_, i) => {
+    const [a, b] = r2(i), u = a * 2 * Math.PI
+    if (shape === 'sphere') { const z = 2 * b - 1, r = Math.sqrt(1 - z * z); return [r * Math.cos(u), r * Math.sin(u), z] }
+    if (shape === 'cube') { const f = i % 6, p = 2 * a - 1, q = 2 * b - 1, s = f < 3 ? 1 : -1; return f % 3 === 0 ? [s, p, q] : f % 3 === 1 ? [p, s, q] : [p, q, s] }
+    // torus, tipped toward the camera so the hole shows
+    const v = b * 2 * Math.PI, R = 0.68, r = 0.3, tip = 0.8
+    const x = (R + r * Math.cos(v)) * Math.cos(u), y = (R + r * Math.cos(v)) * Math.sin(u), z = r * Math.sin(v)
+    return [x, y * Math.cos(tip) - z * Math.sin(tip), y * Math.sin(tip) + z * Math.cos(tip)]
+  })
+// a few syllables of speech: bursts of oscillation under a bumpy envelope
+const utterance = (cols: number): number[][] =>
+  Array.from({ length: cols }, (_, i) => {
+    const t = i / cols
+    const env = [[0.14, 0.9], [0.3, 0.6], [0.47, 1], [0.66, 0.75], [0.84, 0.5]].reduce((e, [c, k]) => e + k * Math.exp(-(((t - c) / 0.07) ** 2)), 0)
+    const a = 0.06 + 0.9 * env * (0.55 + 0.45 * Math.abs(Math.sin(i * 1.7) * Math.cos(i * 0.37)))
+    return [-a * (0.85 + 0.15 * Math.sin(i * 2.3)), a]
+  })
 const CLASSES = ['blue', 'orange', 'green', 'purple', 'red', 'teal', 'pink', 'yellow']
 
 let uid = 0
@@ -358,6 +378,33 @@ export function render(d: Diagram, theme?: string, materials = true): string {
         const [zl, zt] = m(proj(zx, zy, 0))
         o += lab(axes[0], 0, -yf * 1.22, -1) + lab(axes[1], -xf * 1.22, 0, -1) + text(axes[2], zl - 8, zt, base - 2, 400, th.sub, 'end')
         box(L, T, n.w, n.h)
+        break
+      }
+      case 'pointcloud': {
+        const [c0, c1] = pair(n.color)
+        const pts: number[][] = n.attrs.points ? JSON.parse(n.attrs.points) : cloud(n.attrs.shape ?? 'torus', +n.attrs.n || 240)
+        const P = pts.map(p => [...proj(p[0], p[1], p[2]), p[3]])
+        const m = fitTo(P, L, T, n.w, n.h, 4)
+        const ds = P.map(p => p[2]), d0 = Math.min(...ds), d1 = Math.max(...ds)
+        P.sort((a, b) => b[2] - a[2]) // far first
+        for (const p of P) {
+          const near = (d1 - p[2]) / (d1 - d0 || 1), [x, y] = m(p)
+          const c = p[3] !== undefined ? th.c[CLASSES[p[3] % CLASSES.length]][1] : mix(c0, c1, 0.3 + 0.7 * near)
+          o += s`<circle cx="${x}" cy="${y}" r="${1 + 1.4 * near}" fill="${c}" fill-opacity="${0.5 + 0.5 * near}"/>`
+        }
+        box(L, T, n.w, n.h)
+        break
+      }
+      case 'waveform': {
+        o = body(rr(L, T, n.w, n.h, 6))
+        const cols: number[][] = n.attrs.wave ? JSON.parse(n.attrs.wave) : utterance(72)
+        const pad = 6, cy = n.y, hh = n.h / 2 - pad, dx = (n.w - 2 * pad) / cols.length
+        let path = ''
+        cols.forEach(([lo, hi], i) => {
+          const x = L + pad + dx * (i + 0.5)
+          path += s`M${x},${cy - Math.max(hi, 0.02) * hh}V${cy - Math.min(lo, -0.02) * hh}`
+        })
+        o += `<path d="${path}" stroke="${stroke}" stroke-width="${f(Math.max(0.8, dx * 0.6))}" stroke-linecap="round"/>`
         break
       }
       case 'sphere': {

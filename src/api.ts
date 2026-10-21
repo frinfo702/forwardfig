@@ -80,6 +80,19 @@ export interface SpaceOptions extends NodeOptions {
   axes?: [string, string, string]
   size?: V2
 }
+export interface PointCloudOptions extends NodeOptions {
+  /** [x, y, z, class?] in [-1, 1]³; default: sampled from `shape` */
+  points?: number[][]
+  shape?: 'torus' | 'sphere' | 'cube'
+  /** points sampled when `points` is omitted (default 240) */
+  n?: number
+  size?: V2
+}
+export interface WaveformOptions extends NodeOptions {
+  /** raw audio in [-1, 1]; reduced to ≤256 min/max columns. Default: a short synthetic utterance */
+  samples?: ArrayLike<number>
+  size?: V2
+}
 export interface SphereOptions extends NodeOptions {
   /** directions [x, y, z, class?]; normalized onto the sphere */
   points?: number[][]
@@ -171,7 +184,7 @@ const graphOf = (xs: Tensor[], who: string) => {
 // --- layers
 
 export type Shape = 'block' | 'thin' | 'text' | 'circle' | 'op' | 'enc' | 'dec' | 'tensor' | 'stack' | 'neurons'
-  | 'vector' | 'image' | 'gaussian' | 'space' | 'sphere'
+  | 'vector' | 'image' | 'gaussian' | 'space' | 'sphere' | 'pointcloud' | 'waveform'
 
 export interface Layer<O extends NodeOptions = NodeOptions> {
   (...inputs: Tensor[]): Tensor
@@ -248,6 +261,24 @@ export const loss = preset('block', 'Loss', { color: 'red', kind: 'loss' })
 export const gaussian = preset<GaussianOptions>('gaussian', '', 'purple')
 export const space = preset<SpaceOptions>('space', '', 'gray')
 export const sphere = preset<SphereOptions>('sphere', '', 'blue')
+export const pointcloud = preset<PointCloudOptions>('pointcloud', '', 'blue')
+
+/** Audio as a waveform. Long signals are reduced to min/max columns, so the SVG stays small. */
+export function waveform(a?: string | WaveformOptions, b?: WaveformOptions): Layer<WaveformOptions> {
+  const [label, { samples, ...o }] = typeof a === 'string' ? [a, b ?? {}] : ['', a ?? {}]
+  let wave: number[][] | undefined
+  if (samples?.length) {
+    const cols = Math.min(256, samples.length), r = (v: number) => Math.round(v * 1000) / 1000
+    wave = Array.from({ length: cols }, (_, i) => {
+      let lo = Infinity, hi = -Infinity
+      for (let j = Math.floor((i * samples.length) / cols); j < Math.floor(((i + 1) * samples.length) / cols); j++) {
+        lo = Math.min(lo, samples[j]); hi = Math.max(hi, samples[j])
+      }
+      return [r(lo), r(hi)]
+    })
+  }
+  return layer('waveform', label, { ...o, ...(wave && { wave }) } as WaveformOptions, 'waveform', { color: 'teal' })
+}
 
 export type ImageSource = string | { currentSrc?: string; src?: string } | { toDataURL(type?: string): string }
 /** A real image: URL, data URL, <img> or <canvas>. */
