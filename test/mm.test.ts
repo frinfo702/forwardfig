@@ -143,6 +143,27 @@ test('crossed blocks and edges get a ✕', () => {
   expect(svg).toContain('opacity=".5"')
 })
 
+test('legend: one entry per look used, inside the viewBox', () => {
+  const build = (fig: Figure) => {
+    const x = fig.input('x')
+    block('W').freeze()(x)
+    block('A').trainable()(x)
+    block('Q', { texture: 'quantized', color: 'blue' })(x)
+  }
+  const viewBox = (svg: string) => /viewBox="([^"]+)"/.exec(svg)![1].split(' ').map(Number)
+  const plain = figure({}, build).svg(), svg = figure({ legend: true }, build).svg()
+  for (const l of ['Frozen', 'Trainable', 'Quantized']) expect(svg).toContain(`>${l}</tspan>`)
+  for (const l of ['Sparse', 'Hatch', 'Removed', 'Glass']) expect(svg).not.toContain(`>${l}</tspan>`)
+  expect(viewBox(svg)[3]).toBeGreaterThan(viewBox(plain)[3] + 20)
+  const right = figure({ legend: { position: 'right', labels: { quantized: '4-bit' } } }, build).svg()
+  expect(right).toContain('>4-bit</tspan>')
+  expect(viewBox(right)[2]).toBeGreaterThan(viewBox(plain)[2] + 40)
+  // nothing to explain: nothing drawn
+  const none = (fig: Figure) => { block('b')(fig.input('x')) }
+  const strip = (svg: string) => svg.replace(/mm\d+-/g, '')
+  expect(strip(figure({ legend: true }, none).svg())).toBe(strip(figure({}, none).svg()))
+})
+
 test('preset(): user-defined block types work like the built-ins', () => {
   const rmsnorm = preset('thin', 'RMSNorm', 'yellow')
   const moe = preset('block', 'MoE', { color: 'orange', ghost: 3, kind: 'moe' })
@@ -204,6 +225,22 @@ test('fontSize changes block size and label size', () => {
   const w = (d: typeof small) => [...d.nodes.values()][1].w
   expect(w(big)).toBeGreaterThan(w(small))
   expect(figure({ style: { fontSize: 18 } }, fig => { block('a')(fig.input('x').edge('lbl')) }).svg()).toContain('font-size="17"')
+})
+
+test('fontFamily sets the svg font, measures labels in it and is escaped', () => {
+  const build = (o: object) => figure(o, fig => { block('Feed Forward')(fig.input('x')) })
+  const serif = build({ style: { fontFamily: 'Times New Roman, serif' } })
+  expect(serif.svg()).toContain('font-family="Times New Roman, serif"')
+  expect(build({ style: { fontFamily: '"Evil" <x>' } }).svg()).toContain('font-family="&quot;Evil&quot; &lt;x&gt;"')
+  try {
+    configure({ style: { fontFamily: 'Georgia' } })
+    expect(build({}).svg()).toContain('font-family="Georgia"')
+  } finally {
+    configure(null)
+  }
+  // the block's own font goes on its label and into the width cache key
+  expect(figure({}, fig => { block('a', { fontFamily: 'Courier' })(fig.input('x')) }).svg()).toContain('<text font-family="Courier"')
+  expect(layoutLabel('Feed Forward', 13, 500, 'Courier')).not.toBe(layoutLabel('Feed Forward', 13, 500))
 })
 
 test('tex spacing: math minus, space around relations and binary ops, none in scripts', () => {

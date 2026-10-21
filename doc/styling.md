@@ -50,13 +50,30 @@ for (const texture of ['ice', 'magma', 'glass', 'metal', 'noise', 'quantized', '
 
 WebGL textures are baked once per block size and embedded as images. Without WebGL — in Node, or with `materials: false` — they fall back to vector looks, as on this page. When a block has both, `texture` decides the surface and the badge still follows `freeze()` / `trainable()` (QLoRA's quantized frozen base, for example).
 
+## Legend
+
+`legend: true` adds a key under the figure: one small block per look the figure actually uses — frozen, trainable, each texture, and ✕ crossed. Looks that don't appear get no entry; a figure without any gets no legend.
+
+```ts figure
+import { Figure, add, block } from 'forwardfig'
+
+const fig = new Figure({ legend: true })
+const x = fig.input('$x$')
+const W = block('Pretrained $W$', { texture: 'quantized', color: 'blue' }).freeze()
+const A = block('$A$', { color: 'orange' }).trainable()
+const B = block('$B$', { color: 'orange' }).trainable()
+add(W(x), B(A(x)))
+```
+
+`legend: { position: 'right' }` puts it beside the figure instead, and `labels` renames entries: `{ labels: { trainable: 'Trained', quantized: '4-bit' } }`. The keys are `frozen`, `trainable`, `crossed` and the texture names. The legend is part of the SVG, so exports include it.
+
 ## Style config
 
 `style` applies to every block in a scope; `kinds` applies to one preset kind and beats `style` at the same level.
 
 ```ts
 configure({ style: { fontSize: 14 }, kinds: { mha: { color: 'purple' } } })  // whole library
-new Figure({ style: { color: 'gray' } })                                    // this figure
+new Figure({ style: { color: 'gray', fontFamily: 'Times New Roman, serif' } }) // this figure
 new Encoder({ style: { fontSize: 11, texture: 'glass' } })                  // blocks made inside this module
 block('x', { fontSize: 20 })                                                // the block itself
 configure(null)                                                             // reset
@@ -64,6 +81,6 @@ configure(null)                                                             // r
 
 Precedence, strongest first: the block's own options › inner module › outer module › figure › `configure()` › the preset's defaults.
 
-- `style` can set `color`, `texture`, `fontSize`, `dashed` and `bold`. At the figure and `configure` level, `fontSize` also sizes edge labels, group titles and captions.
+- `style` can set `color`, `texture`, `fontSize`, `fontFamily`, `dashed` and `bold`. At the figure and `configure` level, `fontSize` also sizes edge labels, group titles and captions, and `fontFamily` (any CSS font family) sets the font of the whole figure, e.g. to match a paper's body text. Math (`$...$`) keeps its TeX font.
 - A texture set through `style` never hides `freeze()` / `trainable()`; a texture on the block itself does.
-- `configure` also takes `theme`, `flow`, `gap`, `materials` and `tex`. It returns a copy of the current config.
+- `configure` also takes `theme`, `flow`, `gap`, `materials`, `legend` and `tex`. It returns a copy of the current config.

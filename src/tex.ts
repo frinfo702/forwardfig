@@ -3,6 +3,8 @@
 // otherwise a tiny built-in fallback covers the subset ML figures use.
 
 export const SANS = 'Inter,"Helvetica Neue",Helvetica,Arial,sans-serif'
+/** normal font weight, the default for labels */
+export const REGULAR = 400
 export const SERIF = '"Latin Modern Math","STIX Two Math","Cambria Math","Times New Roman",serif'
 
 export interface Run {
@@ -130,8 +132,8 @@ const boxes = new Map<string, TextBox>()
 let ctx: CanvasRenderingContext2D | null | undefined
 const cache = new Map<string, number>()
 
-export function font(size: number, it: boolean, b: boolean | number, serif: boolean) {
-  return `${it ? 'italic ' : ''}${b === true ? 700 : b || 400} ${size}px ${serif ? SERIF : SANS}`
+export function font(size: number, it: boolean, b: boolean | number, serif: boolean, family = SANS) {
+  return `${it ? 'italic ' : ''}${b === true ? 700 : b || 400} ${size}px ${serif ? SERIF : family}`
 }
 
 function charW(c: string) {
@@ -158,8 +160,8 @@ export function measure(t: string, f: string, size: number): number {
 // --- label layout ------------------------------------------------------------
 
 /** Lay out a label: newline, `\\` or `<br>` break lines, `$...$` switches to math. */
-export function layoutLabel(label: string, size: number, weight = 400): TextBox {
-  const key = label + '\0' + size + '\0' + weight + '\0' + (engine === undefined ? !!mathjax() : !!engine)
+export function layoutLabel(label: string, size: number, weight = REGULAR, family = SANS): TextBox {
+  const key = label + '\0' + size + '\0' + weight + '\0' + family + '\0' + (engine === undefined ? !!mathjax() : !!engine)
   const hit = boxes.get(key)
   if (hit) return hit
   const lines: Run[][] = [], widths: number[] = []
@@ -186,7 +188,7 @@ export function layoutLabel(label: string, size: number, weight = 400): TextBox 
           // italic correction: an italic glyph's top leans into an upright neighbour
           if (italic && !it.it && cls !== 'punct') gap += 0.08
           x += gap * sz
-          const w = measure(it.t, font(sz, it.it, it.b || (it.serif ? false : weight), it.serif), sz)
+          const w = measure(it.t, font(sz, it.it, it.b || (it.serif ? false : weight), it.serif, family), sz)
           const last = runs[runs.length - 1]
           if (!gap && last && last.dy === dy && last.size === sz && last.it === it.it && last.b === it.b && last.serif === it.serif) last.t += it.t
           else runs.push({ t: it.t, x, dy, size: sz, it: it.it, b: it.b, serif: it.serif })

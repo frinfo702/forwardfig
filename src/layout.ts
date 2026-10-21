@@ -1,5 +1,5 @@
 import type { Diagram, Edge, Node } from './types'
-import { layoutLabel } from './tex'
+import { REGULAR, SANS, layoutLabel } from './tex'
 
 // Layout = a grid. Main axis: rank (longest path). Cross axis: lane (a node inherits
 // its first predecessor's lane, so chains stay perfectly straight). Edges are
@@ -32,8 +32,8 @@ type R = { u: number; v: number; hu: number; hv: number }
 export type Box = [number, number, number, number]
 export const hits = (a: Box, b: Box) => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1]
 
-function size(n: Node, horiz: boolean, base: number) {
-  const fs = labelSize(n, base), lb = layoutLabel(n.label, fs, 500)
+function size(n: Node, horiz: boolean, base: number, family: string) {
+  const fs = labelSize(n, base), ff = n.attrs.fontFamily || family, lb = layoutLabel(n.label, fs, 500, ff)
   let w: number, h: number
   switch (n.shape) {
     case 'thin': w = Math.max(lb.w + 26, 64); h = lb.h + 9; break
@@ -47,7 +47,7 @@ function size(n: Node, horiz: boolean, base: number) {
     case 'neurons': { const c = (+n.attrs.n || 4) * 20 + 4; [w, h] = horiz ? [22, c] : [c, 22]; break }
     case 'vector': {
       const vals = values(n)
-      const cw = Math.max(36, ...vals.map(v => layoutLabel(v.trim(), fs).w + 14))
+      const cw = Math.max(36, ...vals.map(v => layoutLabel(v.trim(), fs, REGULAR, ff).w + 14))
       const ch = Math.max(20, fs + 8)
       ;[w, h] = horiz ? [cw, vals.length * ch + 4] : [vals.length * cw + 4, ch + 2]
       break
@@ -79,8 +79,8 @@ export function layout(d: Diagram) {
   const horiz = d.dir === 'LR' || d.dir === 'RL'
   const [gapM, gapC] = d.gap ?? (horiz ? [56, 36] : [30, 44])
   const nodes = [...d.nodes.values()]
-  const base = d.fontSize ?? FS
-  for (const n of nodes) size(n, horiz, base)
+  const base = d.fontSize ?? FS, family = d.fontFamily ?? SANS
+  for (const n of nodes) size(n, horiz, base, family)
   const M = (n: Node) => (horiz ? n.w : n.h), C = (n: Node) => (horiz ? n.h : n.w)
   const toS = (u: number, v: number): V => (d.dir === 'TB' ? [v, u] : d.dir === 'BT' ? [v, -u] : d.dir === 'LR' ? [u, v] : [-u, v])
   const toA = (x: number, y: number): V => (d.dir === 'TB' ? [y, x] : d.dir === 'BT' ? [-y, x] : d.dir === 'LR' ? [x, y] : [-x, y])
@@ -173,7 +173,7 @@ export function layout(d: Diagram) {
   for (const e of d.edges) {
     const a = d.nodes.get(e.from)!, b = d.nodes.get(e.to)!
     if (!e.label || !inGrid.has(a.id) || !inGrid.has(b.id) || rk(b) <= rk(a)) continue
-    const lb = layoutLabel(e.label, base - 1)
+    const lb = layoutLabel(e.label, base - 1, REGULAR, family)
     need[rk(b)] = Math.max(need[rk(b)], horiz ? lb.w + 24 : lb.h + 16)
   }
   const lp = [lw[0] / 2], rp = [rs[0] / 2]
@@ -371,12 +371,12 @@ export function layout(d: Diagram) {
   for (const n of nodes) {
     bs.push([n.x - n.w / 2, n.y - n.h / 2, n.x + n.w / 2, n.y + n.h / 2 + (n.attrs.caption ? 20 : 0)])
     if (OUTSIDE.has(n.shape) && n.label) {
-      const t = layoutLabel(n.label, labelSize(n, base), 500), y = n.y - n.h / 2 - 11 - +(n.attrs.ghost ?? n.attrs.heads ?? 0) * 5
+      const t = layoutLabel(n.label, labelSize(n, base), 500, n.attrs.fontFamily || family), y = n.y - n.h / 2 - 11 - +(n.attrs.ghost ?? n.attrs.heads ?? 0) * 5
       bs.push([n.x - t.w / 2, y - t.h / 2, n.x + t.w / 2, y + t.h / 2])
     }
   }
   for (const g of d.groups) if (g.w && g.label) {
-    const t = layoutLabel(g.label, base - 2, 600)
+    const t = layoutLabel(g.label, base - 2, 600, family)
     bs.push([g.x + 12, g.y + 13 - t.h / 2, g.x + 12 + t.w, g.y + 13 + t.h / 2])
   }
   const segs = d.edges.flatMap(e => e.pts.slice(1).map((b, i): [Edge, number, Box] => {
@@ -385,7 +385,7 @@ export function layout(d: Diagram) {
   }))
   for (const e of d.edges) {
     if (!e.label || e.pts.length < 2) continue
-    const lb = layoutLabel(e.label, base - 1), f = e.pts[0], l = e.pts[e.pts.length - 1]
+    const lb = layoutLabel(e.label, base - 1, REGULAR, family), f = e.pts[0], l = e.pts[e.pts.length - 1]
     const len = (i: number) => Math.hypot(e.pts[i + 1][0] - e.pts[i][0], e.pts[i + 1][1] - e.pts[i][1])
     let bi = 0
     for (let i = 1; i + 1 < e.pts.length; i++) if (len(i) > len(bi)) bi = i
