@@ -3,6 +3,8 @@
 // otherwise a tiny built-in fallback covers the subset ML figures use.
 
 export const SANS = 'Inter,"Helvetica Neue",Helvetica,Arial,sans-serif'
+/** normal font weight, the default for labels */
+export const REGULAR = 400
 export const SERIF = '"Latin Modern Math","STIX Two Math","Cambria Math","Times New Roman",serif'
 
 export interface Run {
@@ -158,7 +160,7 @@ export function measure(t: string, f: string, size: number): number {
 // --- label layout ------------------------------------------------------------
 
 /** Lay out a label: newline, `\\` or `<br>` break lines, `$...$` switches to math. */
-export function layoutLabel(label: string, size: number, weight = 400, family = SANS): TextBox {
+export function layoutLabel(label: string, size: number, weight = REGULAR, family = SANS): TextBox {
   const key = label + '\0' + size + '\0' + weight + '\0' + family + '\0' + (engine === undefined ? !!mathjax() : !!engine)
   const hit = boxes.get(key)
   if (hit) return hit

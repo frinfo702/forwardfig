@@ -1,5 +1,5 @@
 import type { Diagram, Edge, Node } from './types'
-import { SANS, layoutLabel } from './tex'
+import { REGULAR, SANS, layoutLabel } from './tex'
 
 // Layout = a grid. Main axis: rank (longest path). Cross axis: lane (a node inherits
 // its first predecessor's lane, so chains stay perfectly straight). Edges are
@@ -45,7 +45,7 @@ function size(n: Node, horiz: boolean, base: number, family: string) {
     case 'neurons': { const c = (+n.attrs.n || 4) * 20 + 4; [w, h] = horiz ? [22, c] : [c, 22]; break }
     case 'vector': {
       const vals = values(n)
-      const cw = Math.max(36, ...vals.map(v => layoutLabel(v.trim(), fs, 400, ff).w + 14))
+      const cw = Math.max(36, ...vals.map(v => layoutLabel(v.trim(), fs, REGULAR, ff).w + 14))
       const ch = Math.max(20, fs + 8)
       ;[w, h] = horiz ? [cw, vals.length * ch + 4] : [vals.length * cw + 4, ch + 2]
       break
@@ -171,7 +171,7 @@ export function layout(d: Diagram) {
   for (const e of d.edges) {
     const a = d.nodes.get(e.from)!, b = d.nodes.get(e.to)!
     if (!e.label || !inGrid.has(a.id) || !inGrid.has(b.id) || rk(b) <= rk(a)) continue
-    const lb = layoutLabel(e.label, base - 1, 400, family)
+    const lb = layoutLabel(e.label, base - 1, REGULAR, family)
     need[rk(b)] = Math.max(need[rk(b)], horiz ? lb.w + 24 : lb.h + 16)
   }
   const lp = [lw[0] / 2], rp = [rs[0] / 2]
@@ -347,7 +347,7 @@ export function layout(d: Diagram) {
   // --- edge labels: beside the longest segment, outside of U turns
   for (const e of d.edges) {
     if (!e.label || e.pts.length < 2) continue
-    const lb = layoutLabel(e.label, base - 1, 400, family)
+    const lb = layoutLabel(e.label, base - 1, REGULAR, family)
     let best = 0, bi = 0
     for (let i = 0; i + 1 < e.pts.length; i++) {
       const L = Math.hypot(e.pts[i + 1][0] - e.pts[i][0], e.pts[i + 1][1] - e.pts[i][1])

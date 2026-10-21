@@ -1,7 +1,7 @@
 import type { Diagram, Edge, Group, Node } from './types'
 import { FS, OUTSIDE, imageMatrix, labelSize, nums, values } from './layout'
 import { bake, type Material } from './materials'
-import { SANS, SERIF, layoutLabel } from './tex'
+import { REGULAR, SANS, SERIF, layoutLabel } from './tex'
 
 type Pair = [fill: string, stroke: string]
 export interface Theme {
@@ -682,7 +682,7 @@ export function render(d: Diagram, theme?: string, materials = true): string {
         bs.push([Math.min(a[0], b[0]) - 2, Math.min(a[1], b[1]) - 2, Math.max(a[0], b[0]) + 2, Math.max(a[1], b[1]) + 2])
       }
       if (e.label && e.lx !== undefined) {
-        const t = layoutLabel(e.label, base - 1, 400, family)
+        const t = layoutLabel(e.label, base - 1, REGULAR, family)
         bs.push([e.lx - t.w / 2, e.ly! - t.h / 2, e.lx + t.w / 2, e.ly! + t.h / 2])
       }
     }
