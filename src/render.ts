@@ -1,5 +1,5 @@
-import type { Diagram, Edge, Group, Node } from './parse'
-import { FS, OUTSIDE, nums } from './layout'
+import type { Diagram, Edge, Group, Node } from './types'
+import { FS, OUTSIDE, nums, values } from './layout'
 import { bake } from './materials'
 import { SANS, SERIF, layoutLabel } from './tex'
 
@@ -44,6 +44,22 @@ const rr = (x: number, y: number, w: number, h: number, r: number) => {
 }
 const circ = (x: number, y: number, r: number) => s`M${x - r},${y}a${r},${r} 0 1 0 ${2 * r},0a${r},${r} 0 1 0 ${-2 * r},0z`
 const poly = (...p: number[]) => 'M' + p.map(f).join(',').replace(/([^,]*,[^,]*),/g, '$1L') + 'z'
+
+// 3D: a fixed oblique camera. proj → [screen x, screen y, depth (larger = farther)]
+const AZ = -0.65, EL = 0.45, ca = Math.cos(AZ), sa = Math.sin(AZ), ce = Math.cos(EL), se = Math.sin(EL)
+const proj = (x: number, y: number, z: number): [number, number, number] => {
+  const x1 = x * ca - y * sa, y1 = x * sa + y * ca
+  return [x1, -z * ce - y1 * se, y1 * ce - z * se]
+}
+// uniform scale of projected points into a box
+const fitTo = (pts: number[][], L: number, T: number, w: number, h: number, pad: number) => {
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1])
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys)
+  const k = Math.min((w - 2 * pad) / (x1 - x0 || 1), (h - 2 * pad) / (y1 - y0 || 1))
+  const ox = L + w / 2 - ((x0 + x1) / 2) * k, oy = T + h / 2 - ((y0 + y1) / 2) * k
+  return (p: number[]) => [ox + p[0] * k, oy + p[1] * k]
+}
+const CLASSES = ['blue', 'orange', 'green', 'purple', 'red', 'teal', 'pink', 'yellow']
 
 let uid = 0
 
@@ -207,7 +223,7 @@ export function render(d: Diagram, theme?: string, materials = true): string {
         break
       }
       case 'vector': {
-        const vals = n.label.split(',')
+        const vals = values(n)
         o = body(rr(L, T, n.w, n.h, 3))
         const cell = (horiz ? n.h - 4 : n.w - 4) / vals.length
         vals.forEach((v, i) => {
@@ -217,11 +233,103 @@ export function render(d: Diagram, theme?: string, materials = true): string {
         })
         break
       }
-      case 'image':
-        o = s`<image href="${esc(n.attrs.src ?? '')}" x="${L}" y="${T}" width="${n.w}" height="${n.h}" preserveAspectRatio="xMidYMid slice"/>` +
-          `<path d="${rr(L, T, n.w, n.h, 2)}" fill="none" stroke="${stroke}"/>`
+      case 'image': {
+        const [W, H] = nums(n.attrs.size, [64, 64]), k = +n.attrs.n || 1, gn = +n.attrs.grid || 0
+        const fit = n.attrs.fit === 'contain' ? 'xMidYMid meet' : 'xMidYMid slice'
+        for (let i = 0; i < k; i++) {
+          const x = L + i * 6, y = T + i * 6, d = rr(x, y, W, H, 3)
+          if (i < k - 1) { o += `<path d="${d}" fill="${th.dark ? '#1b2029' : '#fff'}" stroke="${stroke}"/>`; continue }
+          const id = `${P}k${clips++}`
+          o += `<clipPath id="${id}"><path d="${d}"/></clipPath>` +
+            s`<image href="${esc(n.attrs.src ?? '')}" x="${x}" y="${y}" width="${W}" height="${H}" preserveAspectRatio="${fit}" clip-path="url(#${id})"/>`
+          if (gn > 1) {
+            let g = ''
+            for (let j = 1; j < gn; j++) g += s`M${x + (W * j) / gn},${y}v${H}M${x},${y + (H * j) / gn}h${W}`
+            o += `<path d="${g}" stroke="#fff" stroke-opacity=".9"/>`
+          }
+          o += `<path d="${d}" fill="none" stroke="${stroke}"/>`
+        }
         box(L, T, n.w, n.h)
         break
+      }
+      case 'gaussian': {
+        const peaks: number[][] = JSON.parse(n.attrs.peaks ?? '[[0,0,1,0.45]]')
+        const N = Math.min(40, +n.attrs.mesh || 16), [c0, c1] = pair(n.color)
+        const height = (x: number, y: number) => peaks.reduce((a, [px, py, amp = 1, sg = 0.45]) => a + amp * Math.exp(-((x - px) ** 2 + (y - py) ** 2) / (2 * sg * sg)), 0)
+        const Z = Array.from({ length: N + 1 }, (_, i) => Array.from({ length: N + 1 }, (_, j) => height(-1 + (2 * i) / N, -1 + (2 * j) / N)))
+        const zmax = Math.max(...Z.flat()) || 1
+        const Q = Z.map((row, i) => row.map((z, j) => proj(-1 + (2 * i) / N, -1 + (2 * j) / N, z / zmax)))
+        const floor = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([x, y]) => proj(x, y, 0))
+        const m = fitTo([...Q.flat(), ...floor], L, T, n.w, n.h, 2)
+        const pt = (p: number[]) => m(p).map(f).join(',')
+        o += `<path d="M${floor.map(pt).join('L')}z" fill="${c0}" fill-opacity=".5" stroke="${c1}" stroke-opacity=".4"/>`
+        const quads: [number, string, number][] = []
+        for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+          const q = [Q[i][j], Q[i + 1][j], Q[i + 1][j + 1], Q[i][j + 1]]
+          quads.push([q.reduce((a, p) => a + p[2], 0), `M${q.map(pt).join('L')}z`, (Z[i][j] + Z[i + 1][j + 1]) / 2 / zmax])
+        }
+        quads.sort((a, b) => b[0] - a[0])
+        for (const [, d, z] of quads) {
+          const c = mix(c0, c1, 0.12 + 0.88 * z)
+          o += `<path d="${d}" fill="${c}" stroke="${mix(c, th.dark ? '#ffffff' : c1, 0.35)}" stroke-width=".5"/>`
+        }
+        box(L, T, n.w, n.h)
+        break
+      }
+      case 'space': {
+        const [c0, c1] = pair(n.color)
+        const pts: number[][] = JSON.parse(n.attrs.points ?? '[]'), axes: string[] = JSON.parse(n.attrs.axes ?? '["x","y","z"]')
+        // back panes: the far x wall, the far y wall and the floor, like a matplotlib 3D axes
+        const xf = proj(1, 0, 0)[2] > proj(-1, 0, 0)[2] ? 1 : -1, yf = proj(0, 1, 0)[2] > proj(0, -1, 0)[2] ? 1 : -1
+        const corners = [-1, 1].flatMap(x => [-1, 1].flatMap(y => [-1, 1].map(z => proj(x, y, z))))
+        const m = fitTo(corners, L, T, n.w, n.h, 10)
+        const P2 = (x: number, y: number, z: number) => m(proj(x, y, z)).map(f).join(',')
+        const pane = (q: number[][]) => `<path d="M${q.map(p => P2(p[0], p[1], p[2])).join('L')}z" fill="${c0}" fill-opacity=".55" stroke="${c1}" stroke-opacity=".45" stroke-linejoin="round"/>`
+        o += pane([[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1]]) +
+          pane([[xf, -1, -1], [xf, 1, -1], [xf, 1, 1], [xf, -1, 1]]) +
+          pane([[-1, yf, -1], [1, yf, -1], [1, yf, 1], [-1, yf, 1]])
+        let grid = ''
+        for (const t of [-0.5, 0, 0.5]) grid += `M${P2(t, -1, -1)}L${P2(t, 1, -1)}M${P2(-1, t, -1)}L${P2(1, t, -1)}M${P2(xf, -1, t)}L${P2(xf, 1, t)}M${P2(-1, yf, t)}L${P2(1, yf, t)}`
+        o += `<path d="${grid}" stroke="${c1}" stroke-opacity=".18"/>`
+        const sorted = pts.map(p => [...p, proj(p[0], p[1], p[2])[2]]).sort((a, b) => b[b.length - 1] - a[a.length - 1])
+        for (const p of sorted) {
+          const [x, y] = m(proj(p[0], p[1], p[2])), c = th.c[CLASSES[(p.length > 4 ? p[3] : 0) % CLASSES.length]][1]
+          o += s`<circle cx="${x}" cy="${y}" r="3.2" fill="${c}" stroke="${th.dark ? '#0e1117' : '#fff'}" stroke-width=".9"/>`
+        }
+        const lab = (t: string, x: number, y: number, z: number) => { const [a, b] = m(proj(x, y, z)); return text(t, a, b, FS - 2, 400, th.sub) }
+        // z goes beside whichever vertical edge forms the left silhouette
+        const [zx, zy] = [[xf, -yf], [-xf, yf]].sort((p, q) => m(proj(p[0], p[1], 0))[0] - m(proj(q[0], q[1], 0))[0])[0]
+        const [zl, zt] = m(proj(zx, zy, 0))
+        o += lab(axes[0], 0, -yf * 1.22, -1) + lab(axes[1], -xf * 1.22, 0, -1) + text(axes[2], zl - 8, zt, FS - 2, 400, th.sub, 'end')
+        box(L, T, n.w, n.h)
+        break
+      }
+      case 'sphere': {
+        const [c0, c1] = pair(n.color), R = Math.min(n.w, n.h) / 2 - 2, key = 'sph-' + (n.color ?? 'white').replace('#', '')
+        if (!defs.has(key)) defs.set(key, `<radialGradient id="${P}${key}" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="${th.dark ? mix(c0, c1, 0.35) : '#ffffff'}"/><stop offset=".55" stop-color="${c0}"/><stop offset="1" stop-color="${mix(c0, c1, 0.35)}"/></radialGradient>`)
+        o += s`<circle cx="${n.x}" cy="${n.y}" r="${R}" fill="url(#${P}${key})" stroke="${c1}"/>`
+        let front = '', back = ''
+        const curve = (at: (t: number) => number[]) => {
+          let prev: boolean | undefined
+          for (let i = 0; i <= 64; i++) {
+            const [a, b, dz] = proj(...(at((i / 64) * Math.PI * 2) as [number, number, number])), vis = dz <= 0
+            const seg = (vis === prev ? 'L' : 'M') + f(n.x + a * R) + ',' + f(n.y + b * R)
+            if (vis) front += seg; else back += seg
+            prev = vis
+          }
+        }
+        for (const z of [-0.5, 0, 0.5]) { const r = Math.sqrt(1 - z * z); curve(t => [r * Math.cos(t), r * Math.sin(t), z]) }
+        for (const lon of [0, Math.PI / 3, (2 * Math.PI) / 3]) curve(t => [Math.cos(t) * Math.cos(lon), Math.cos(t) * Math.sin(lon), Math.sin(t)])
+        o += `<path d="${back}" fill="none" stroke="${c1}" stroke-opacity=".22" stroke-dasharray="2 2"/><path d="${front}" fill="none" stroke="${c1}" stroke-opacity=".55"/>`
+        const pts: number[][] = JSON.parse(n.attrs.points ?? '[]')
+        for (const p of pts) {
+          const l = Math.hypot(p[0], p[1], p[2]) || 1, [a, b, dz] = proj(p[0] / l, p[1] / l, p[2] / l)
+          const c = th.c[CLASSES[(p[3] ?? 0) % CLASSES.length]][1]
+          o += s`<circle cx="${n.x + a * R}" cy="${n.y + b * R}" r="3" fill="${c}" stroke="${th.dark ? '#0e1117' : '#fff'}" stroke-width=".8" opacity="${dz <= 0 ? 1 : 0.3}"/>`
+        }
+        box(L, T, n.w, n.h)
+        break
+      }
       default: {
         const r = n.shape === 'thin' ? 5 : 7
         o = body(rr(L, T, n.w, n.h, r), undefined, r) + label()

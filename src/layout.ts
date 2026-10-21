@@ -1,4 +1,4 @@
-import type { Diagram, Edge, Node } from './parse'
+import type { Diagram, Edge, Node } from './types'
 import { layoutLabel } from './tex'
 
 // Layout = a grid. Main axis: rank (longest path). Cross axis: lane (a node inherits
@@ -7,7 +7,8 @@ import { layoutLabel } from './tex'
 // around obstacles. No splines, no force simulation.
 
 export const FS = 13
-export const OUTSIDE = new Set(['tensor', 'stack', 'image', 'neurons'])
+export const OUTSIDE = new Set(['tensor', 'stack', 'image', 'neurons', 'gaussian', 'space', 'sphere'])
+export const values = (n: Node): string[] => JSON.parse(n.attrs.values ?? '[]')
 export const nums = (s: string | undefined, def: number[]) => (s ? s.split(',').map(Number) : def)
 const REL: Record<string, [number, number]> = { 'left-of': [-1, 0], 'right-of': [1, 0], above: [0, -1], below: [0, 1] }
 const GP = 14 // group padding
@@ -29,12 +30,15 @@ function size(n: Node, horiz: boolean) {
       break
     case 'neurons': { const c = (+n.attrs.n || 4) * 20 + 4; [w, h] = horiz ? [22, c] : [c, 22]; break }
     case 'vector': {
-      const vals = n.label.split(',')
+      const vals = values(n)
       const cw = Math.max(36, ...vals.map(v => layoutLabel(v.trim(), FS - 1).w + 14))
       ;[w, h] = horiz ? [cw, vals.length * 20 + 4] : [vals.length * cw + 4, 22]
       break
     }
-    case 'image': [w, h] = nums(n.attrs.size, [64, 64]); break
+    case 'image': { const [W, H] = nums(n.attrs.size, [64, 64]), k = +n.attrs.n || 1; w = W + (k - 1) * 6; h = H + (k - 1) * 6; break }
+    case 'gaussian': [w, h] = nums(n.attrs.size, [120, 84]); break
+    case 'space': [w, h] = nums(n.attrs.size, [110, 100]); break
+    case 'sphere': [w, h] = nums(n.attrs.size, [84, 84]); break
     case 'text': w = lb.w + 8; h = lb.h + 4; break
     default: w = Math.max(lb.w + 30, 76); h = lb.h + 18
   }
@@ -269,7 +273,14 @@ export function layout(d: Diagram) {
       fin(e, [[u, S.v + k * S.hv], [u, T.v - k * T.hv]])
     } else if (T.u > S.u) {
       // forward but blocked (residual / skip): leave the out side, run beside the corridor, enter T's side
-      const s0 = S.u + S.hu, g = Math.min(gapM / 2, (T.u - T.hu - s0) / 2)
+      const s0 = S.u + S.hu
+      let g = Math.min(gapM / 2, (T.u - T.hu - s0) / 2)
+      // entering a group from outside: branch just inside the group box (which sits GP before the first block)
+      const a = d.nodes.get(e.from)!, b = d.nodes.get(e.to)!
+      if (b.groups.some(x => !a.groups.includes(x))) {
+        const first = Math.min(...[...rc.values()].filter(r => r.u - r.hu > s0 + 1 && r.u < T.u && r.v + r.hv > lo && r.v - r.hv < hi).map(r => r.u - r.hu))
+        if (first - GP + 6 - s0 > 6) g = first - GP + 6 - s0
+      }
       const v = channel(side, s0 + g, T.u + T.hu, lo, hi)
       fin(e, [[s0, S.v], [s0 + g, S.v], [s0 + g, v], [T.u, v], [T.u, T.v + side * T.hv]])
     } else {
@@ -302,14 +313,18 @@ export function layout(d: Diagram) {
   // --- groups: members + their internal edges, children before parents
   for (const g of [...d.groups].reverse()) {
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
-    const add = (x: number, y: number) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y) }
+    const add = (x: number, y: number, p = GP) => { x0 = Math.min(x0, x - p); y0 = Math.min(y0, y - p); x1 = Math.max(x1, x + p); y1 = Math.max(y1, y + p) }
     const mem = new Set(nodes.filter(n => n.groups.includes(g.id)).map(n => n.id))
     for (const id of mem) { const n = d.nodes.get(id)!; add(n.x - n.w / 2, n.y - n.h / 2); add(n.x + n.w / 2, n.y + n.h / 2) }
-    for (const e of d.edges) if (mem.has(e.from) && mem.has(e.to)) for (const [x, y] of e.pts) add(x, y)
+    for (const e of d.edges) {
+      if (mem.has(e.from) && mem.has(e.to)) for (const [x, y] of e.pts) add(x, y)
+      // a residual entering from outside branches inside the box: keep its channel in, with a slim margin
+      else if (mem.has(e.to) && e.pts.length === 5) for (const [x, y] of e.pts.slice(2)) add(x, y, 6)
+    }
     for (const c of d.groups) if (c.parent === g.id && c.w) { add(c.x, c.y); add(c.x + c.w, c.y + c.h) }
     if (x0 === Infinity) continue
     const top = g.label ? 18 : 0
-    Object.assign(g, { x: x0 - GP, y: y0 - GP - top, w: x1 - x0 + GP * 2, h: y1 - y0 + GP * 2 + top })
+    Object.assign(g, { x: x0, y: y0 - top, w: x1 - x0, h: y1 - y0 + top })
   }
   return d
 }

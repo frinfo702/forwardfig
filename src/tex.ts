@@ -119,13 +119,13 @@ export function measure(t: string, f: string, size: number): number {
 
 const boxes = new Map<string, TextBox>()
 
-/** Lay out a label: `\\` or `<br>` break lines, `$...$` switches to math. */
+/** Lay out a label: newline, `\\` or `<br>` break lines, `$...$` switches to math. */
 export function layoutLabel(label: string, size: number, weight = 400): TextBox {
   const key = label + '\0' + size + '\0' + weight
   const hit = boxes.get(key)
   if (hit) return hit
   const lines: Run[][] = [], widths: number[] = []
-  for (const line of label.split(/\\\\|<br\s*\/?>/)) {
+  for (const line of label.split(/\n|\\\\|<br\s*\/?>/)) {
     const runs: Run[] = []
     let x = 0
     const place = (items: Item[], dy: number, sz: number) => {

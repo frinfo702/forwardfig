@@ -1,73 +1,116 @@
 import { expect, test } from 'bun:test'
-import { layout, parse, render } from '../src/index'
+import { Figure, Module, Tensor, add, conv, ffn, figure, gaussian, image, mha, norm, op, space, sphere, text, thin, block, act, type Layer } from '../src/index'
+import { layout } from '../src/layout'
 import { layoutLabel } from '../src/tex'
 
-const src = `flow TB
-x text "$\\mathbf{x}$"
-a mha
-n norm
-f ffn "🧊 FFN"
-x -> a -> n -> f
-x -> n`
+class EncoderLayer extends Module {
+  attn = mha()
+  n1 = norm()
+  ff = ffn('🧊 FFN')
+  n2 = norm()
+  forward(x: Tensor) {
+    const h = this.n1(add(x, this.attn(x)))
+    return this.n2(add(h, this.ff(h)))
+  }
+}
 
-test('parse: presets, emoji flags, edges', () => {
-  const d = parse(src)
-  expect(d.nodes.get('a')!.label).toBe('Multi-Head Attention')
-  expect(d.nodes.get('f')!.flags.has('frozen')).toBe(true)
-  expect(d.nodes.get('f')!.label).toBe('FFN')
-  expect(d.edges.length).toBe(4)
+test('Module: callable instance, group box, layers become nodes', () => {
+  const fig = new Figure({ flow: 'BT' })
+  const enc = new EncoderLayer({ label: 'Encoder', repeat: 'N×' })
+  enc(fig.input('x'))
+  const d = fig.diagram()
+  expect(d.groups.map(g => g.label)).toEqual(['Encoder'])
+  const labels = [...d.nodes.values()].map(n => n.label)
+  expect(labels).toEqual(['x', 'Multi-Head Attention', '+', 'Add & Norm', 'FFN', '+', 'Add & Norm'])
+  const ffnNode = [...d.nodes.values()].find(n => n.label === 'FFN')!
+  expect(ffnNode.flags.has('frozen')).toBe(true)
+  expect(ffnNode.groups).toEqual([d.groups[0].id])
 })
 
-test('layout: chain is straight, blocked skip goes around', () => {
-  const d = layout(parse(src))
-  const [xa, an, nf, skip] = d.edges
-  for (const e of [xa, an, nf]) expect(e.pts.length).toBe(2)
-  expect(new Set([xa, an, nf].flatMap(e => e.pts.map(p => p[0]))).size).toBe(1)
-  expect(skip.pts.length).toBe(5)
-  const a = d.nodes.get('a')!
-  expect(Math.max(...skip.pts.map(p => p[0]))).toBeGreaterThan(a.x + a.w / 2)
+test('Module.freeze() freezes everything inside unless a layer says otherwise', () => {
+  class M extends Module {
+    a = block('a')
+    b = block('b').train()
+    forward(x: Tensor) { return this.b(this.a(x)) }
+  }
+  const fig = new Figure()
+  new M().freeze()(fig.input('x'))
+  const [, a, b] = [...fig.diagram().nodes.values()]
+  expect(a.flags.has('frozen')).toBe(true)
+  expect(b.flags.has('train')).toBe(true)
 })
 
-test('tex: scripts and fonts', () => {
-  const b = layoutLabel('$\\mathbf{x}_{t-1}^2$', 13)
-  const runs = b.lines[0]
-  expect(runs[0]).toMatchObject({ t: 'x', b: true, it: false })
-  expect(runs.some(r => r.t === 't' && r.it && r.dy > 0)).toBe(true)
-  expect(runs.some(r => r.t === '2' && r.dy < 0)).toBe(true)
-})
-
-test('render: svg out, errors carry line numbers', () => {
-  expect(render(src)).toStartWith('<svg')
-  expect(() => render('flow XY')).toThrow('line 1')
-  expect(() => render('a -> ')).toThrow('line 1')
+test('layout: chain is straight, residual goes around', () => {
+  const d = layout(figure({}, fig => {
+    const x = fig.input('x')
+    const a = mha()(x)
+    norm()(a, x)
+  }).diagram())
+  const [xa, an, xn] = d.edges
+  expect(xa.pts.length).toBe(2)
+  expect(an.pts.length).toBe(2)
+  expect(xn.pts.length).toBe(5)
 })
 
 test('layout: a detouring edge does not shift the straight arrow into the same node', () => {
-  const d = layout(parse(`flow TB
-x text "x"
-c1 conv
-c2 conv
-add op "+"
-x -> c1 -> c2 -> add
-x -> add`))
-  const [, , c2add, skip] = d.edges
-  expect(skip.pts.length).toBe(5)
-  expect(c2add.pts.length).toBe(2)
-  expect(c2add.pts[0][0]).toBe(d.nodes.get('add')!.x)
+  const d = layout(figure({}, fig => {
+    const x = fig.input('x')
+    const s = op('+')
+    s(conv()(conv()(x)), x)
+  }).diagram())
+  const sum = [...d.nodes.values()].find(n => n.shape === 'op')!
+  const straight = d.edges.find(e => e.to === sum.id && e.pts.length === 2)!
+  expect(straight.pts[0][0]).toBe(sum.x)
 })
 
 test('layout: a side branch joins a small ⊕ from the side, the trunk stays straight', () => {
-  const d = layout(parse(`flow BT
-x text "x"
-W block "W"
-A thin "A"
-B thin "B"
-add op "+"
-x -> W -> add
-x -> A -> B -> add`))
-  const add = d.nodes.get('add')!
-  const wAdd = d.edges[1], bAdd = d.edges[4]
-  expect(wAdd.pts.every(p => p[0] === add.x)).toBe(true)
-  expect(bAdd.pts.length).toBe(3)
-  expect(bAdd.pts[2]).toEqual([add.x + add.w / 2, add.y])
+  const d = layout(figure({ flow: 'BT' }, fig => {
+    const x = fig.input('x')
+    add(block('W')(x), thin('B')(thin('A')(x)))
+  }).diagram())
+  const sum = [...d.nodes.values()].find(n => n.shape === 'op')!
+  const [trunk, side] = d.edges.filter(e => e.to === sum.id)
+  expect(trunk.pts.every(p => p[0] === sum.x)).toBe(true)
+  expect(side.pts.length).toBe(3)
+  expect(side.pts[2]).toEqual([sum.x + sum.w / 2, sum.y])
+})
+
+test('edge styles, placement refs, extra edges', () => {
+  const fig = new Figure({ flow: 'LR' })
+  const a = fig.input('a')
+  const b = act()(a.edge({ label: 'go', dashed: true }))
+  const side: Layer = text('note', { below: b })
+  fig.input(side)
+  fig.edge(b, act('back'), 'x')
+  const d = fig.diagram()
+  expect(d.edges[0]).toMatchObject({ op: '..>', label: 'go' })
+  expect([...d.nodes.values()][2].attrs.below).toBe(b.node)
+  expect(d.edges[1].to).toBe('n3')
+})
+
+test('errors are explicit', () => {
+  expect(() => mha()()).toThrow('without inputs')
+  const f1 = new Figure(), f2 = new Figure()
+  expect(() => add(f1.input('a'), f2.input('b'))).toThrow('same figure')
+  expect(() => new Figure().input(block('a', { id: 'k' })).graph.node(block('b', { id: 'k' }))).toThrow('duplicate id')
+})
+
+test('3D shapes and images render', () => {
+  const svg = figure({ flow: 'LR' }, fig => {
+    const x = fig.input(image('data:image/png;base64,AA==', 'img', { grid: 4, n: 3 }))
+    const z = gaussian('$p(z)$', { peaks: [[-0.4, 0, 1], [0.5, 0.3, 0.6, 0.3]] })(x)
+    const s = space('latent', { points: [[0, 0, 0, 1], [0.5, -0.5, 0.2, 2]] })(z)
+    sphere('$\\mathbb{S}^2$', { points: [[1, 0, 0], [0, 0, 1, 3]] })(s)
+  }).svg()
+  expect(svg).toStartWith('<svg')
+  expect(svg).toContain('<image href="data:image/png;base64,AA=="')
+  expect(svg).toContain('radialGradient')
+  expect(svg).not.toContain('NaN')
+})
+
+test('tex: scripts and fonts', () => {
+  const runs = layoutLabel('$\\mathbf{x}_{t-1}^2$', 13).lines[0]
+  expect(runs[0]).toMatchObject({ t: 'x', b: true, it: false })
+  expect(runs.some(r => r.t === 't' && r.it && r.dy > 0)).toBe(true)
+  expect(runs.some(r => r.t === '2' && r.dy < 0)).toBe(true)
 })

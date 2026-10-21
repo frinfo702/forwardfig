@@ -1,79 +1,83 @@
 # machine-mermaid
 
-A mermaid-style DSL built for ML architecture diagrams. Zero dependencies, ~16 KB gzipped, outputs SVG strings (it also works in SSR or Node).
+Draw ML architecture figures in TypeScript, written the way you write the model. It has zero dependencies, is about 19 KB gzipped, and outputs SVG (it also works in Node).
 
-- **Layout**: a grid of ranks and lanes. Chains are always straight, edges are orthogonal with rounded corners, and residuals automatically detour around obstacles. No wiggly curves.
-- **ML presets**: `mha` `ffn` `norm` `embed` `linear` `softmax` `conv` `tensor` `stack` `neurons` `enc` `dec` `op "+"` and more
-- **Materials**: 🧊 / `frozen` → clear ice (bevel, specular, cracks, frost ferns). 🔥 / `train` → magma (cracked crust and molten veins). These use the WebGL shaders from [portfolio](https://github.com/frinfo702/portfolio), run once per block size and baked into a still image embedded in the SVG. Identical sizes share one image. Without WebGL (SSR or Node), it falls back to a lightweight vector look (frost texture, snow, ❄ badge), and `{ materials: false }` forces that fallback.
-- **LaTeX**: write `$\mathbf{x}_{t-1}$` or `$p_\theta(\cdot)$` directly. A built-in mini TeX engine handles it without KaTeX.
+Demo (paper figure gallery and playground): https://frinfo702.github.io/machine-mermaid/demo/
 
-```html
-<pre class="machine-mermaid">
-flow BT
-q text "$Q$"
-k text "$K$"
-mm matmul
-sm softmax
-q, k -> mm -> sm
-</pre>
-<script type="module">
-  import mm from './dist/machine-mermaid.js'
-  mm.run()                        // renders every .machine-mermaid
-  // const svg = mm.render(src, { theme: 'dark' })   // returns a string
-</script>
-```
+```ts
+import { Figure, Module, Tensor, mha, norm, ffn, text } from 'machine-mermaid'
 
-Run `bun run build` to get `dist/machine-mermaid.js` (ESM) and `dist/machine-mermaid.iife.js`. Demo (paper figure gallery and playground): https://frinfo702.github.io/machine-mermaid/demo/. To view it locally, run `bun run build && python3 -m http.server` and open `demo/`. Pushing to `main` deploys it automatically through GitHub Pages (`.github/workflows/pages.yml`).
-
-## Syntax
-
-```
-flow TB | BT | LR | RL          # flow direction
-theme light | dark
-gap 30 44                        # gap along the flow / across it
-
-id  preset "label" color flags key=value
-a -> b -> c                      # chains
-q, k -> mm                       # fan-in / fan-out
-a -> "label" b                   # edge label (or put it at the end of the line)
-a ..> b curve                    # dashed, curved
-style a, b frozen color=#ff8800  # apply attributes to existing nodes later
-
-group enc "Encoder" repeat="N×" frozen {
-  ...                            # nodes defined or listed here belong to the group
+class EncoderLayer extends Module {        // like nn.Module
+  attn = mha()
+  n1 = norm()
+  ff = ffn()
+  n2 = norm()
+  forward(x: Tensor) {
+    const h = this.n1(this.attn(x), x)     // Add & Norm with a residual
+    return this.n2(this.ff(h), h)
+  }
 }
-rank a b c                       # force the same rank
+
+const fig = new Figure({ flow: 'BT' })      // drawing side, like matplotlib
+const y = new EncoderLayer({ repeat: 'N×' }).freeze()(fig.input('$\\mathbf{x}$'))
+text('$\\mathbf{h}$')(y)
+fig.mount('#figure')                        // or fig.svg() for a string
 ```
 
-| Edge | Meaning |
-|---|---|
-| `->` `-->` | arrow |
-| `..>` | dashed arrow |
-| `--` `..` | line with no arrowhead |
-| `=>` | thick arrow. Between two `neurons` nodes it draws a fully connected layer |
-| `<->` | bidirectional |
+## Model
 
-Edge flags: `skip` (forces a detour) `curve` `dashed` `thick` `side=left|right|top|bottom` `color=`
+| | Role | Analogy |
+|---|---|---|
+| `Layer` | One block (one node). Calling it as `layer(x, y)` draws edges into it and returns a Tensor. Calling the same layer again adds edges to the same node, so shared weights stay one block. | `nn.Linear` / `keras.layers.Dense` |
+| `Module` | A subclass that implements `forward()`. Instances are callable. Pass `label` / `repeat` / `box` to draw a group box. | `nn.Module` |
+| `Tensor` | The value flowing between blocks. `x.edge('$r$')` and `x.edge({ dashed: true })` style the next edge it enters. | KerasTensor |
+| `Figure` | The drawing side: `input()`, `edge()` (edges outside forward), `rank()`, `svg()` / `mount()`. | `plt.figure` |
 
-**Shapes**: `block` `thin` `op` (`"+"` ⊕, `"*"` ⊗, `"~"` positional encoding) `var` (circle) `tensor size=W,H,D` `stack n=4 size=W,H offset=7` `enc` `dec` `neurons n=4` `vector "0.2,0.7,0.1"` `image src=...` `text`
+There are two ways to write a figure. Use whichever suits the figure, or mix them.
 
-**Presets** (shape + color + default label): `mha` `attn` `ffn` `mlp` `norm` `embed` `linear` `softmax` `matmul` `concat` `conv` `pool` `act` `dropout` `loss`
+- **All in the figure**: `figure({ flow: 'LR' }, fig => { ... })` builds everything in one place.
+- **By module**: define each `Module` alongside your model code, then call them in the figure.
 
-**Colors**: `pink orange yellow green blue purple teal red gray white` or `#hex`
+```ts
+// functional style
+const fig = new Figure({ flow: 'BT' })
+const x = fig.input('$\\mathbf{x}$')
+const W = block('Pretrained $W$').freeze()               // 🧊
+const A = thin('$A$').train(), B = thin('$B$').train()   // 🔥
+add(W(x), B(A(x).edge('$r$')))
+```
 
-**Flags**: `frozen` (also 🧊 / ❄️) `train` (also 🔥) `dashed` `bold`. Attributes: `ghost=3` (stacked copies, e.g. multi-head) `caption=` `w=` `h=`
+## Layers
 
-**Placement**:
-- Automatic: the rank is the longest path. The lane is inherited from the first predecessor. When several predecessors on the same rank merge, the node goes in the middle.
-- `lane=1.5` sets the lane explicitly (fractions allowed). `align=id` puts the node in the same lane as `id`.
-- `left-of=id` `right-of=id` `above=id` `below=id` (`dist=22`) place a node next to another.
-- `at=x,y` sets absolute coordinates. `nudge=dx,dy` makes small adjustments.
+All layers take `(label?, options?)` or `(options?)`.
 
-**Labels**: `\\` or `<br>` for line breaks. `$...$` is math. Supported: `^ _ \mathbf \mathrm \text \boldsymbol \mathcal \mathbb`, Greek letters, common symbols, `\hat \tilde \bar \vec`, `\frac` (rendered as a/b).
+- Basic: `block` `thin` `text` `circle` `op('+' | '*' | '~')` `enc` `dec` `tensor({ size: [w,h,d] })` `stack({ n, size, offset })` `neurons({ n })` `vector(values)`
+- ML presets: `mha` `attention` `ffn` `mlp` `norm` `embed` `linear` `softmax` `matmul` `concat` `conv` `pool` `act` `dropout` `loss`
+- Functional: `add(...xs)` (⊕) and `mul(...xs)` (⊗) create a new node on each call.
+- 3D:
+  - `gaussian({ peaks: [[x, y, amp?, sigma?]], mesh })`: a Gaussian or mixture surface.
+  - `space({ points: [[x, y, z, class?]], axes })`: a 3D scatter on axis panes.
+  - `sphere({ points })`: points on a hypersphere.
+- Images: `image(src, label?, { size, fit: 'cover' | 'contain', grid, n })`. `src` can be a URL, a data URL, an `<img>` or a `<canvas>`. `grid` draws a ViT-style patch grid, and `n` draws a batch of frames.
 
-## Design
+Common options: `color` `frozen` `train` `dashed` `bold` `w` `h` `ghost` `caption` `id`
 
-- Layout: ranks plus lanes in O(V+E), then routing edges (straight → Z bend → detour). It averages about 0.13 ms per diagram in the gallery examples.
-- Materials: one WebGL context is shared, and output is cached per (material, size). Each image is roughly 20–50 KB as WebP (PNG on Safari).
+- Placement is automatic by default. To override it, use `lane` (fractions allowed), `align: ref`, `leftOf` / `rightOf` / `above` / `below: ref` (with `dist`), `at: [x, y]` or `nudge: [dx, dy]`.
+- `freeze()` / `train()` can be called on a layer or on a module. On a module they apply to every block inside it, unless a layer is marked explicitly.
+- A 🧊 or 🔥 in a label works the same way.
+
+Edges (`x.edge({...})` / `fig.edge(a, b, {...})`): `label` `dashed` `arrow: 'end' | 'both' | 'none'` `thick` `dense` (fully connected between `neurons`) `skip` `curve` `side` `color`
+
+Labels: a newline (`\n`) starts a new line, and `$...$` is TeX. Supported: `^ _ \mathbf \mathrm \text \boldsymbol \mathcal \mathbb`, Greek letters, common symbols, `\hat \tilde \bar \vec`, and `\frac` (rendered as a/b).
+
+## Drawing core
+
+The layout and rendering engine is independent of the API above. `fig.diagram()` returns plain `Diagram` data (nodes, edges, groups, ranks), which `draw(diagram, { theme })` turns into SVG. Anything that can generate a Diagram, from another language or as JSON, can reuse the same engine.
+
+- Layout: a grid of ranks (longest path) and lanes (a block inherits its first input's lane), so chains are always straight. Edges are orthogonal: straight, one Z bend, or a detour. When several arrows enter one block, the one that goes dead straight never moves, and on a small ⊕ the others join from the side.
+- Materials: 🧊 / 🔥 run the WebGL shaders from [portfolio](https://github.com/frinfo702/portfolio) once per block size and embed the result as an image. Without WebGL it falls back to a vector look, and `new Figure({ materials: false })` forces that fallback.
 - Text is measured with canvas `measureText` (cached). Without a DOM, a width-table approximation is used.
-- Known limits: crossings are not minimized (declaration order decides the result). TeX is a subset, with no fraction stacking and no matrices. Edge labels are not checked for collisions with nodes.
+
+To develop locally: run `bun install && bun test && bun run build`, then `python3 -m http.server` and open `demo/`. Pushing to `main` deploys the demo to GitHub Pages.
+
+Known limits: crossings are not minimized (declaration order decides the result). TeX is a subset. Edge labels are not checked for collisions.
