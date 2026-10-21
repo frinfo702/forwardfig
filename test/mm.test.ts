@@ -143,6 +143,27 @@ test('crossed blocks and edges get a ✕', () => {
   expect(svg).toContain('opacity=".5"')
 })
 
+test('legend: one entry per look used, inside the viewBox', () => {
+  const build = (fig: Figure) => {
+    const x = fig.input('x')
+    block('W').freeze()(x)
+    block('A').trainable()(x)
+    block('Q', { texture: 'quantized', color: 'blue' })(x)
+  }
+  const viewBox = (svg: string) => /viewBox="([^"]+)"/.exec(svg)![1].split(' ').map(Number)
+  const plain = figure({}, build).svg(), svg = figure({ legend: true }, build).svg()
+  for (const l of ['Frozen', 'Trainable', 'Quantized']) expect(svg).toContain(`>${l}</tspan>`)
+  for (const l of ['Sparse', 'Hatch', 'Removed', 'Glass']) expect(svg).not.toContain(`>${l}</tspan>`)
+  expect(viewBox(svg)[3]).toBeGreaterThan(viewBox(plain)[3] + 20)
+  const right = figure({ legend: { position: 'right', labels: { quantized: '4-bit' } } }, build).svg()
+  expect(right).toContain('>4-bit</tspan>')
+  expect(viewBox(right)[2]).toBeGreaterThan(viewBox(plain)[2] + 40)
+  // nothing to explain: nothing drawn
+  const none = (fig: Figure) => { block('b')(fig.input('x')) }
+  const strip = (svg: string) => svg.replace(/mm\d+-/g, '')
+  expect(strip(figure({ legend: true }, none).svg())).toBe(strip(figure({}, none).svg()))
+})
+
 test('preset(): user-defined block types work like the built-ins', () => {
   const rmsnorm = preset('thin', 'RMSNorm', 'yellow')
   const moe = preset('block', 'MoE', { color: 'orange', ghost: 3, kind: 'moe' })

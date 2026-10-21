@@ -26,6 +26,8 @@ export interface Diagram {
   fontSize?: number
   /** base CSS font family; blocks may set attrs.fontFamily */
   fontFamily?: string
+  /** a key to the looks the figure uses (frozen, trainable, textures, crossed); labels override the names */
+  legend?: { position?: 'bottom' | 'right'; labels?: Partial<Record<string, string>> }
   nodes: Map<string, Node>; edges: Edge[]; groups: Group[]; ranks: string[][]
 }
 

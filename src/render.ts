@@ -734,14 +734,48 @@ export function render(d: Diagram, theme?: string, materials = true): string {
     return `<path d="M${reg.map(p => p.map(f).join(',')).join('L')}z" fill="none" stroke="${stroke}" stroke-width="2" stroke-linejoin="round"/>` +
       `<path d="M${sorted[0].map(f)}L${lo.map(f)}M${sorted[3].map(f)}L${hi.map(f)}" stroke="${stroke}" stroke-opacity=".75" stroke-dasharray="3 3"/>`
   }).join('')
+  // --- legend: a small block per look the figure uses, drawn by drawNode itself, after
+  // everything else so it can sit beside the figure's bounds
+  const LOOKS = ['frozen', 'trainable', 'glass', 'metal', 'noise', 'quantized', 'sparse', 'hatch', 'crossed']
+  const drawLegend = ({ position, labels = {} }: NonNullable<Diagram['legend']>) => {
+    const used = new Map<string, string | undefined>() // look → color of the first block that has it
+    const use = (k: string, c?: string) => { if (!used.has(k)) used.set(k, c) }
+    for (const n of [...ns, ...d.groups]) {
+      const fx = n.attrs.texture ?? (n.flags.has('frozen') ? 'ice' : n.flags.has('train') ? 'magma' : '')
+      const b = mark(n, fx)
+      if (b) use(b === 'ice' ? 'frozen' : 'trainable')
+      if (fx && fx !== 'ice' && fx !== 'magma') use(fx, (n as { color?: string }).color ?? n.attrs.color)
+      if (n.flags.has('crossed')) use('crossed')
+    }
+    if (d.edges.some(e => e.flags.has('crossed'))) use('crossed')
+    const items = LOOKS.filter(k => used.has(k)).map(k => [k, labels[k] ?? (k === 'crossed' ? 'Removed' : k[0].toUpperCase() + k.slice(1))] as const)
+    if (!items.length) return ''
+    // the badge pokes out of the swatch's top right corner: keep a gap for it
+    const W = 30, H = 18, size = base - 1, right = position === 'right'
+    const tw = items.map(([, l]) => layoutLabel(l, size, REGULAR, family).w)
+    let x = right ? x1 + 28 : (x0 + x1) / 2 - tw.reduce((a, w) => a + W + 12 + w + 20, -20) / 2
+    let y = right ? y0 + H / 2 + 6 : y1 + 22 + H / 2
+    let o = ''
+    items.forEach(([k, l], i) => {
+      const flag = k === 'frozen' ? 'frozen' : k === 'trainable' ? 'train' : k === 'crossed' ? 'crossed' : ''
+      o += drawNode({
+        id: '', shape: 'block', label: '', color: used.get(k), flags: new Set(flag ? [flag] : []), attrs: flag ? {} : { texture: k },
+        groups: [], order: 0, x: x + W / 2, y, w: W, h: H,
+      }) + text(l, x + W + 12, y, size, REGULAR, th.text, 'start')
+      if (right) y += H + 14
+      else x += W + 12 + tw[i] + 20
+    })
+    return o
+  }
   const groups = d.groups.map(drawGroup).join('')
   const edges = d.edges.map(drawEdge).join('')
   const nodes = [...d.nodes.values()].map(drawNode).join('')
   const labels = d.edges.filter(e => e.label && e.lx !== undefined)
     .map(e => text(e.label!, e.lx!, e.ly!, base - 1, 400, th.sub)).join('')
+  const legend = d.legend ? drawLegend(d.legend) : ''
   if (x0 === Infinity) x0 = y0 = x1 = y1 = 0
   const m = 14, W = x1 - x0 + m * 2, H = y1 - y0 + m * 2
   const bg = th.bg !== 'none' ? s`<rect x="${x0 - m}" y="${y0 - m}" width="${W}" height="${H}" rx="10" fill="${th.bg}"/>` : ''
   return s`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0 - m} ${y0 - m} ${W} ${H}" width="${W}" height="${H}" font-family="${esc(family)}" style="max-width:100%;height:auto" role="img">` +
-    `<defs>${[...defs.values()].join('')}</defs>${bg}<g>${groups}</g><g>${edges}</g><g>${nodes}</g><g>${zooms}</g><g paint-order="stroke" stroke="${th.halo}" stroke-width="4" stroke-linejoin="round">${labels}</g></svg>`
+    `<defs>${[...defs.values()].join('')}</defs>${bg}<g>${groups}</g><g>${edges}</g><g>${nodes}</g><g>${zooms}</g><g paint-order="stroke" stroke="${th.halo}" stroke-width="4" stroke-linejoin="round">${labels}</g>${legend}</svg>`
 }

@@ -14,7 +14,7 @@ Everything is a named export of `forwardfig`; the default export bundles them as
 
 | Member | Signature | Notes |
 | --- | --- | --- |
-| `new Figure` | `(options?: FigureOptions)` | `flow`, `theme`, `gap`, `materials`, `style`, `kinds`. |
+| `new Figure` | `(options?: FigureOptions)` | `flow`, `theme`, `gap`, `materials`, `legend`, `style`, `kinds`. |
 | `figure` | `(build)` or `(options, build)` → `Figure` | Builds a figure in one callback. |
 | `fig.input` | `(label \| layer = '', options?)` → `Tensor` | A starting point. With a layer, `options` are added to it. |
 | `fig.edge` | `(from: Tensor, to: Tensor \| Layer, style?)` → `this` | An edge outside `forward`. Keeps `from`'s `.edge()` style. |

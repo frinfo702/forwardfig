@@ -26,6 +26,7 @@ A review pass over the TypeScript API. Four changes break existing code; the [mi
 - `fig.input(layer, options)` adds `options` to the layer (they were ignored).
 - `ModuleOptions` takes `frozen` and `trainable`.
 - `Layer.shape` is typed as `Shape`.
+- `FigureOptions.legend`: a key to the looks a figure uses (frozen, trainable, textures, crossed), under or beside it, with optional label overrides.
 
 ### Fixed
 
