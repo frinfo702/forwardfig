@@ -23,7 +23,7 @@ q, k -> mm -> sm
 </script>
 ```
 
-Run `bun run build` to get `dist/machine-mermaid.js` (ESM) and `dist/machine-mermaid.iife.js`. To see the gallery and playground, run `python3 -m http.server` and open `examples/`.
+Run `bun run build` to get `dist/machine-mermaid.js` (ESM) and `dist/machine-mermaid.iife.js`. Demo (paper figure gallery and playground): https://frinfo702.github.io/machine-mermaid/demo/. To view it locally, run `bun run build && python3 -m http.server` and open `demo/`. Pushing to `main` deploys it automatically through GitHub Pages (`.github/workflows/pages.yml`).
 
 ## Syntax
 

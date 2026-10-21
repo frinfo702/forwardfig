@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>machine-mermaid</title>
+<meta name="description" content="Architecture figures from landmark ML papers, redrawn from a few lines of text.">
+<style>
+  :root { --bg:#f6f7fa; --card:#fff; --fg:#1d2430; --muted:#6b7485; --line:#e3e7ee; --accent:#3b82f6; }
+  :root[data-theme=dark] { --bg:#0a0c10; --card:#0e1117; --fg:#e8edf5; --muted:#9aa4b5; --line:#222833; --accent:#5ab1ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.55 Inter,system-ui,-apple-system,sans-serif; }
+  a { color:var(--accent); text-decoration:none; } a:hover { text-decoration:underline; }
+  .wrap { max-width:1200px; margin:auto; padding:0 16px; }
+  header { padding:56px 0 24px; }
+  header .top { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+  h1 { font-size:clamp(28px,5vw,44px); margin:0; letter-spacing:-.02em; }
+  .lede { color:var(--muted); max-width:640px; margin:10px 0 0; font-size:17px; }
+  .links { display:flex; gap:8px; flex-wrap:wrap; margin-top:18px; }
+  .pill, button { border:1px solid var(--line); background:var(--card); color:var(--fg); border-radius:999px; padding:6px 14px; font:inherit; font-size:13px; cursor:pointer; }
+  pre.code { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; overflow:auto; font:12.5px/1.6 ui-monospace,Menlo,monospace; margin:20px 0 0; }
+  h2.section { font-size:13px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:40px 0 14px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(360px,1fr)); gap:16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; display:flex; flex-direction:column; gap:10px; min-width:0; }
+  .card.wide { grid-column:1/-1; }
+  .card h3 { margin:0; font-size:15px; }
+  .card .cite { color:var(--muted); font-size:12.5px; margin-top:-6px; }
+  .machine-mermaid { margin:0; padding:8px 0; display:flex; justify-content:center; align-items:center; flex:1; overflow-x:auto; }
+  details summary { cursor:pointer; color:var(--muted); font-size:12px; user-select:none; }
+  details pre { font:12px/1.55 ui-monospace,Menlo,monospace; background:var(--bg); padding:10px 12px; border-radius:8px; overflow:auto; margin:8px 0 0; }
+  #play { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.3fr); gap:12px; }
+  textarea { width:100%; min-height:300px; font:12.5px/1.6 ui-monospace,Menlo,monospace; background:var(--bg); color:var(--fg); border:1px solid var(--line); border-radius:10px; padding:12px; resize:vertical; }
+  #out { display:flex; align-items:center; justify-content:center; overflow-x:auto; }
+  #stat { color:var(--muted); font-weight:400; font-size:12px; }
+  footer { color:var(--muted); font-size:13px; padding:40px 0 56px; }
+  @media (max-width:760px) { #play { grid-template-columns:1fr; } .grid { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="top">
+    <h1>machine-mermaid</h1>
+    <button id="theme" aria-label="Toggle dark mode">◐ Theme</button>
+  </div>
+  <p class="lede">Architecture figures from landmark ML papers, each redrawn from a few lines of text. Straight orthogonal edges, ML-native shapes, inline TeX, and 🧊 frozen / 🔥 trainable materials. Zero dependencies.</p>
+  <div class="links">
+    <a class="pill" href="https://github.com/frinfo702/machine-mermaid">GitHub</a>
+    <a class="pill" href="#playground">Playground</a>
+  </div>
+<pre class="code">&lt;pre class="machine-mermaid"&gt;
+flow BT
+q, k -&gt; mm -&gt; sm
+mm matmul
+sm softmax
+&lt;/pre&gt;
+&lt;script type="module"&gt;
+  import mm from './machine-mermaid.js'
+  mm.run()
+&lt;/script&gt;</pre>
+</header>
+
+<h2 class="section">Transformers</h2>
+<div class="grid">
+
+<section class="card"><h3>Transformer</h3><div class="cite"><a href="https://arxiv.org/abs/1706.03762">Vaswani et al., Attention Is All You Need (2017)</a> · Fig. 1</div><pre class="machine-mermaid">
+flow BT
+group enc repeat="N×" {
+  e_add op "+"
+  e_mha mha
+  e_n1  norm
+  e_ff  ffn
+  e_n2  norm
+}
+group dec repeat="N×" {
+  d_add  op "+"
+  d_mmha mha "Masked\\Multi-Head Attention"
+  d_n1   norm
+  d_mha  mha
+  d_n2   norm
+  d_ff   ffn
+  d_n3   norm
+}
+x    text "Inputs"
+y    text "Outputs\\(shifted right)"
+inp  embed "Input Embedding"
+out  embed "Output Embedding"
+lin  linear
+sm   softmax
+prob text "Output Probabilities"
+e_pe op "~" left-of=e_add
+d_pe op "~" right-of=d_add
+
+x -> inp -> e_add -> e_mha -> e_n1 -> e_ff -> e_n2
+y -> out -> d_add -> d_mmha -> d_n1 -> d_mha -> d_n2 -> d_ff -> d_n3 -> lin -> sm -> prob
+e_add -> e_n1
+e_n1 -> e_n2
+d_add -> d_n1
+d_n1 -> d_n2
+d_n2 -> d_n3
+e_n2 -> d_mha
+e_pe -> e_add
+d_pe -> d_add
+</pre></section>
+
+<section class="card"><h3>Scaled Dot-Product Attention</h3><div class="cite"><a href="https://arxiv.org/abs/1706.03762">Vaswani et al. (2017)</a> · Fig. 2 left</div><pre class="machine-mermaid">
+flow BT
+q text "$Q$"
+k text "$K$"
+v text "$V$"
+mm1  matmul
+sc   thin "Scale" yellow
+mask thin "Mask (opt.)" pink
+smx  softmax "SoftMax"
+mm2  matmul
+q, k -> mm1 -> sc -> mask -> smx -> mm2
+v -> mm2
+</pre></section>
+
+<section class="card"><h3>Multi-Head Attention</h3><div class="cite"><a href="https://arxiv.org/abs/1706.03762">Vaswani et al. (2017)</a> · Fig. 2 right</div><pre class="machine-mermaid">
+flow BT
+v text "$V$"
+k text "$K$"
+q text "$Q$"
+lv linear ghost=3
+lk linear ghost=3
+lq linear ghost=3
+sdpa block "Scaled Dot-Product\\Attention" purple ghost=3
+cat  concat
+o    linear
+v -> lv
+k -> lk
+q -> lq
+lv, lk, lq -> sdpa -> cat -> o
+</pre></section>
+
+<section class="card wide"><h3>Vision Transformer (ViT)</h3><div class="cite"><a href="https://arxiv.org/abs/2010.11929">Dosovitskiy et al., An Image is Worth 16x16 Words (2021)</a> · Fig. 1</div><pre class="machine-mermaid">
+flow LR
+img  tensor "Image" size=6,56,56 gray
+pat  stack "Patches" n=6 size=16,16 offset=5
+proj linear "Linear Projection\\of Flattened Patches"
+add  op "+"
+pe   text "Position\\Embedding" below=add
+cls  text "[class]\\token" above=add
+enc  block "Transformer\\Encoder" orange ghost=3
+head mlp "MLP\\Head"
+y    text "Class"
+img -> pat -> proj -> add -> enc -> head -> y
+pe -> add
+cls -> add
+</pre></section>
+
+<section class="card"><h3>Mixture of Experts</h3><div class="cite"><a href="https://arxiv.org/abs/2101.03961">Fedus et al., Switch Transformers (2021)</a> · Fig. 2</div><pre class="machine-mermaid">
+flow BT
+x   text "$\mathbf{x}$" lane=1.5
+r   softmax "Router" lane=1.5
+e1  ffn "FFN 1" lane=0
+e2  ffn "FFN 2" lane=1
+e3  ffn "FFN 3" lane=2
+e4  ffn "FFN 4" lane=3
+add op "*"
+y   text "$\mathbf{y}=p_i(\mathbf{x})\,E_i(\mathbf{x})$"
+x -> r
+r -> e1, e3, e4 dashed
+r -> e2 "$p_2$"
+e2 -> add -> y
+</pre></section>
+
+</div>
+
+<h2 class="section">Vision</h2>
+<div class="grid">
+
+<section class="card wide"><h3>LeNet-style CNN</h3><div class="cite"><a href="http://yann.lecun.com/exdb/publis/pdf/lecun-98.pdf">LeCun et al., Gradient-Based Learning Applied to Document Recognition (1998)</a> · Fig. 2</div><pre class="machine-mermaid">
+flow LR
+x   tensor "Input" size=8,64,64 gray
+c1  stack "Feature maps" n=4 size=52,52
+p1  stack "f.maps" n=4 size=30,30
+c2  stack "f.maps" n=8 size=24,24 offset=4
+p2  stack "" n=8 size=14,14 offset=4
+fc  neurons "FC" n=5
+out neurons "Output" n=3 purple
+x -> "Convolutions" c1 -> "Subsampling" p1 -> "Convolutions" c2 -> "Subsampling" p2 -> fc
+fc => out
+</pre></section>
+
+<section class="card"><h3>Residual Block</h3><div class="cite"><a href="https://arxiv.org/abs/1512.03385">He et al., Deep Residual Learning (2016)</a> · Fig. 2</div><pre class="machine-mermaid">
+flow TB
+x    text "$\mathbf{x}$"
+c1   conv "weight layer"
+r1   act "relu"
+c2   conv "weight layer"
+add  op "+"
+r2   act "relu"
+y    text "$\mathcal{F}(\mathbf{x})+\mathbf{x}$"
+x -> c1 -> r1 -> c2 -> add -> r2 -> y
+x -> add "identity"
+</pre></section>
+
+<section class="card"><h3>U-Net</h3><div class="cite"><a href="https://arxiv.org/abs/1505.04597">Ronneberger et al., U-Net (2015)</a> · Fig. 1</div><pre class="machine-mermaid">
+flow LR
+gap 34 22
+inp text "input\\image"
+e1  stack "64"   n=2 size=12,72 offset=5 blue
+e2  stack "128"  n=2 size=12,56 offset=5 blue lane=1
+e3  stack "256"  n=2 size=12,42 offset=5 blue lane=2
+b   stack "512"  n=2 size=12,30 offset=5 purple lane=3
+d3  stack "256"  n=2 size=12,42 offset=5 teal lane=2
+d2  stack "128"  n=2 size=12,56 offset=5 teal lane=1
+d1  stack "64"   n=2 size=12,72 offset=5 teal lane=0
+out text "segmentation\\map"
+inp -> e1
+e1 -> e2 -> e3 -> b color=red
+b -> d3 -> d2 -> d1 color=green
+d1 -> out
+e1 ..> d1
+e2 ..> d2
+e3 ..> d3
+</pre></section>
+
+</div>
+
+<h2 class="section">Generative models</h2>
+<div class="grid">
+
+<section class="card wide"><h3>DDPM</h3><div class="cite"><a href="https://arxiv.org/abs/2006.11239">Ho et al., Denoising Diffusion Probabilistic Models (2020)</a> · Fig. 2</div><pre class="machine-mermaid">
+flow LR
+xT  var "$\mathbf{x}_T$" gray
+d1  text "$\cdots$"
+xt  var "$\mathbf{x}_t$" gray
+xt1 var "$\mathbf{x}_{t-1}$" gray
+d2  text "$\cdots$"
+x0  var "$\mathbf{x}_0$"
+xT -> d1 -> xt -> "$p_\theta(\mathbf{x}_{t-1}|\mathbf{x}_t)$" xt1 -> d2 -> x0
+xt1 ..> xt "$q(\mathbf{x}_t|\mathbf{x}_{t-1})$" curve
+</pre></section>
+
+<section class="card"><h3>Variational Autoencoder</h3><div class="cite"><a href="https://arxiv.org/abs/1312.6114">Kingma &amp; Welling, Auto-Encoding Variational Bayes (2014)</a></div><pre class="machine-mermaid">
+flow LR
+x   text "$\mathbf{x}$"
+e   enc "$q_\phi(\mathbf{z}|\mathbf{x})$"
+mu  thin "$\boldsymbol\mu$" teal
+sg  thin "$\boldsymbol\sigma$" teal
+z   var "$\mathbf{z}$" yellow
+eps text "$\epsilon\sim\mathcal{N}(0,I)$" below=z
+dd  dec "$p_\theta(\mathbf{x}|\mathbf{z})$"
+xh  text "$\hat{\mathbf{x}}$"
+x -> e -> mu, sg -> z -> dd -> xh
+eps -> z
+</pre></section>
+
+<section class="card"><h3>Generative Adversarial Network</h3><div class="cite"><a href="https://arxiv.org/abs/1406.2661">Goodfellow et al., Generative Adversarial Nets (2014)</a></div><pre class="machine-mermaid">
+flow LR
+z   text "$\mathbf{z}\sim p_\mathbf{z}$"
+G   block "🔥 Generator $G$"
+xf  var "$G(\mathbf{z})$" pink
+xr  var "$\mathbf{x}$" green
+src text "$p_\text{data}$" left-of=xr
+D   block "🔥 Discriminator $D$"
+y   text "real / fake"
+z -> G -> xf -> D -> y
+src -> xr -> D
+</pre></section>
+
+</div>
+
+<h2 class="section">Multimodal &amp; fine-tuning</h2>
+<div class="grid">
+
+<section class="card"><h3>CLIP</h3><div class="cite"><a href="https://arxiv.org/abs/2103.00020">Radford et al., Learning Transferable Visual Models (2021)</a> · Fig. 1</div><pre class="machine-mermaid">
+flow LR
+txt text "\"Pepper the\\aussie pup\""
+img text "image"
+te  enc "Text\\Encoder" purple
+ie  enc "Image\\Encoder" green
+tv  vector "$T_1$,$T_2$,$\cdots$,$T_N$" purple
+iv  vector "$I_1$,$I_2$,$\cdots$,$I_N$" green
+sim block "$I_i\cdot T_j$\\contrastive" yellow
+txt -> te -> tv -> sim
+img -> ie -> iv -> sim
+</pre></section>
+
+<section class="card"><h3>LoRA</h3><div class="cite"><a href="https://arxiv.org/abs/2106.09685">Hu et al., LoRA: Low-Rank Adaptation (2021)</a> · Fig. 1</div><pre class="machine-mermaid">
+flow BT
+x  text "$\mathbf{x}\in\mathbb{R}^d$"
+W  block "🧊 Pretrained Weights\\$W\in\mathbb{R}^{d\times d}$" w=170 h=70
+A  thin "🔥 $A=\mathcal{N}(0,\sigma^2)$"
+B  thin "🔥 $B=0$"
+add op "+"
+h  text "$\mathbf{h}$"
+x -> W -> add -> h
+x -> A -> "$r$" B -> add
+</pre></section>
+
+<section class="card wide"><h3>LLaVA</h3><div class="cite"><a href="https://arxiv.org/abs/2304.08485">Liu et al., Visual Instruction Tuning (2023)</a> · Fig. 1, stage 1 (feature alignment)</div><pre class="machine-mermaid">
+flow BT
+xv   text "Image $\mathbf{X}_\text{v}$"
+xq   text "Language Instruction $\mathbf{X}_\text{q}$"
+ve   enc "🧊 Vision Encoder" w=150
+proj thin "🔥 Projection $\mathbf{W}$"
+zv   vector "$\mathbf{Z}_\text{v}$,,," gray
+hv   vector "$\mathbf{H}_\text{v}$,,," orange
+hq   vector "$\mathbf{H}_\text{q}$,,," blue
+llm  block "🧊 Language Model $f_\phi$" w=330 h=56 lane=0.5
+xa   text "Language Response $\mathbf{X}_\text{a}$" lane=0.5
+xv -> ve -> zv -> proj -> hv -> llm
+xq -> hq -> llm -> xa
+rank hv hq
+</pre></section>
+
+</div>
+
+<h2 class="section" id="playground">Playground</h2>
+<section class="card wide">
+  <h3>Edit me <span id="stat"></span></h3>
+  <div id="play">
+    <textarea id="src" spellcheck="false">flow LR
+img  text "image"
+txt  text "prompt"
+vit  enc "🧊 ViT-L/14"
+proj linear "🔥 Projector"
+tok  embed "🧊 Tokenizer"
+llm  block "🧊 LLM\\$\theta_\text{LM}$" w=120 h=90
+ans  text "$\hat{y}$"
+img -> vit -> proj -> llm
+txt -> tok -> llm -> ans</textarea>
+    <div id="out"></div>
+  </div>
+</section>
+
+<footer>Figures are re-drawings for illustration; see each paper for the original. Built with machine-mermaid.</footer>
+</div>
+
+<script type="module">
+  import mm from '../dist/machine-mermaid.js'
+  const root = document.documentElement
+  // show each figure's source under it
+  for (const pre of document.querySelectorAll('.card pre.machine-mermaid')) {
+    const d = document.createElement('details')
+    d.innerHTML = '<summary>source</summary><pre></pre>'
+    d.querySelector('pre').textContent = pre.textContent.trim()
+    pre.after(d)
+  }
+  const draw = () => {
+    const theme = root.dataset.theme === 'dark' ? 'dark' : 'light'
+    mm.run('.machine-mermaid', { theme })
+    const t0 = performance.now()
+    try { out.innerHTML = mm.render(src.value, { theme }) } catch (e) { out.textContent = e.message }
+    stat.textContent = `· ${(performance.now() - t0).toFixed(2)} ms`
+  }
+  try { if (localStorage.mmTheme) root.dataset.theme = localStorage.mmTheme } catch {}
+  if (!root.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches) root.dataset.theme = 'dark'
+  src.addEventListener('input', draw)
+  document.getElementById('theme').onclick = () => {
+    root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark'
+    try { localStorage.mmTheme = root.dataset.theme } catch {}
+    draw()
+  }
+  draw()
+</script>
+</body>
+</html>
