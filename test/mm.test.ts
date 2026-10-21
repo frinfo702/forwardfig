@@ -509,3 +509,28 @@ test('API: figure(fn), vector label, circle shape, cellSize, space axes, trainab
   new M({ trainable: true })(t.input('x'))
   expect([...t.diagram().nodes.values()][1].flags.has('train')).toBe(true)
 })
+
+test('layout: lanes are reordered when declaration order would cross edges', () => {
+  // proper crossings between segments of different edges (routes are orthogonal)
+  const crossings = (d: ReturnType<typeof layout>) => {
+    const segs = d.edges.flatMap((e, k) => e.pts.slice(1).map((p, i) => [k, e.pts[i], p] as const))
+    let c = 0
+    for (const [k, [ax, ay], [bx, by]] of segs)
+      for (const [m, [cx, cy], [dx, dy]] of segs)
+        if (k !== m && ay === by && cx === dx && Math.min(ax, bx) < cx && cx < Math.max(ax, bx) && Math.min(cy, dy) < ay && ay < Math.max(cy, dy)) c++
+    return c
+  }
+  // x feeds a and b, y feeds c: in declaration order y takes the lane b needs
+  const build = (lane?: number) => layout(figure(fig => {
+    const x = fig.input('x'), y = fig.input('y')
+    block('a')(x)
+    block('b')(x)
+    block('c', lane === undefined ? {} : { lane })(y)
+  }).diagram())
+  const d = build()
+  expect(crossings(d)).toBe(0)
+  const [x, y, a, c] = ['x', 'y', 'a', 'c'].map(s => [...d.nodes.values()].find(n => n.label === s)!.x)
+  expect([x === a, y === c]).toEqual([true, true]) // chains stay straight
+  // an explicit lane is never overridden, even when that leaves the crossing
+  expect(crossings(build(1))).toBe(1)
+})

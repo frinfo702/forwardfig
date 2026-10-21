@@ -28,6 +28,7 @@ A review pass over the TypeScript API. Four changes break existing code; the [mi
 - `Layer.shape` is typed as `Shape`.
 - `FigureOptions.legend`: a key to the looks a figure uses (frozen, trainable, textures, crossed), under or beside it, with optional label overrides.
 - A `forwardfig <file> [-o out.svg] [--theme dark]` command that writes a module's figures as SVG, or as PNG / JPEG / WebP by the `-o` extension with the optional peer dependency `sharp` (`--scale`, `--background`), for Makefile / LaTeX workflows. See [Export](export.md#command-line).
+- Layout reorders lanes to reduce edge crossings. Whole columns swap, so chains stay straight; an explicit `lane` never moves, and groups stay contiguous. Figures without crossings are unchanged.
 
 ### Fixed
 
