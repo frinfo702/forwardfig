@@ -7,7 +7,7 @@ import { layoutLabel } from './tex'
 // around obstacles. No splines, no force simulation.
 
 export const FS = 13
-export const OUTSIDE = new Set(['tensor', 'stack', 'image', 'neurons', 'gaussian', 'space', 'sphere', 'pointcloud', 'waveform'])
+export const OUTSIDE = new Set(['tensor', 'stack', 'image', 'magnify', 'neurons', 'gaussian', 'space', 'sphere', 'pointcloud', 'waveform'])
 export const values = (n: Node): string[] => JSON.parse(n.attrs.values ?? '[]')
 /** label size of a block: its own fontSize, else derived from the figure's base size */
 export const labelSize = (n: Node, base: number) =>
@@ -58,6 +58,7 @@ function size(n: Node, horiz: boolean, base: number) {
       h = Math.abs(b) * bw + Math.abs(d) * bh
       break
     }
+    case 'magnify': [w, h] = nums(n.attrs.size, [64, 64]); break
     case 'gaussian': [w, h] = nums(n.attrs.size, [120, 84]); break
     case 'space': [w, h] = nums(n.attrs.size, [110, 100]); break
     case 'sphere': [w, h] = nums(n.attrs.size, [84, 84]); break

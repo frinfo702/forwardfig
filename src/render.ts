@@ -220,6 +220,26 @@ export function render(d: Diagram, theme?: string, materials = true): string {
     return `<path d="${p}z" fill="#fff" fill-opacity="${th.dark ? 0.55 : 0.92}"/>`
   }
 
+  // --- images: frame geometry, and which image a magnifier looks at
+  const frames = (n: Node) => {
+    const [W, H] = nums(n.attrs.size, [64, 64]), k = +n.attrs.n || 1
+    return {
+      W, H, k, x0: n.x - (W + (k - 1) * 6) / 2, y0: n.y - (H + (k - 1) * 6) / 2,
+      fit: n.attrs.fit === 'contain' ? 'xMidYMid meet' : 'xMidYMid slice',
+      srcs: (n.attrs.srcs ? JSON.parse(n.attrs.srcs) : [n.attrs.src ?? '']) as string[],
+    }
+  }
+  const zoomSource = (n: Node) => {
+    const e = d.edges.find(e => e.to === n.id && d.nodes.get(e.from)?.shape === 'image')
+    return e && d.nodes.get(e.from)
+  }
+  const isZoom = (e: Edge) => { const t = d.nodes.get(e.to)!; return t.shape === 'magnify' && zoomSource(t)?.id === e.from }
+  const zoomRegion = (n: Node, S: Node): number[] => {
+    if (n.attrs.region) return nums(n.attrs.region, [])
+    const g = +S.attrs.grid || 4, [col, row] = nums(n.attrs.patch, [-1, -1])
+    return col >= 0 ? [col / g, row / g, 1 / g, 1 / g] : [0.375, 0.375, 0.25, 0.25]
+  }
+
   // --- nodes
   const drawNode = (n: Node) => {
     const L = n.x - n.w / 2, T = n.y - n.h / 2
@@ -310,17 +330,16 @@ export function render(d: Diagram, theme?: string, materials = true): string {
         break
       }
       case 'image': {
-        const [W, H] = nums(n.attrs.size, [64, 64]), k = +n.attrs.n || 1, gn = +n.attrs.grid || 0
-        const fit = n.attrs.fit === 'contain' ? 'xMidYMid meet' : 'xMidYMid slice'
-        // draw the untransformed frame around the center, then tilt / rotate it there
-        const x0 = n.x - (W + (k - 1) * 6) / 2, y0 = n.y - (H + (k - 1) * 6) / 2
+        const { W, H, k, x0, y0, fit, srcs } = frames(n), gn = +n.attrs.grid || 0
+        // draw the untransformed frames around the center (back to front), then tilt / rotate them there
         for (let i = 0; i < k; i++) {
           const x = x0 + i * 6, y = y0 + i * 6, d = rr(x, y, W, H, 3)
-          if (i < k - 1) { o += `<path d="${d}" fill="${th.dark ? '#1b2029' : '#fff'}" stroke="${stroke}"/>`; continue }
+          const src = srcs.length > 1 ? srcs[k - 1 - i] : i === k - 1 ? srcs[0] : undefined
+          if (!src) { o += `<path d="${d}" fill="${th.dark ? '#1b2029' : '#fff'}" stroke="${stroke}"/>`; continue }
           const id = `${P}k${clips++}`
           o += `<clipPath id="${id}"><path d="${d}"/></clipPath>` +
-            s`<image href="${esc(n.attrs.src ?? '')}" x="${x}" y="${y}" width="${W}" height="${H}" preserveAspectRatio="${fit}" clip-path="url(#${id})"/>`
-          if (gn > 1) {
+            s`<image href="${esc(src)}" x="${x}" y="${y}" width="${W}" height="${H}" preserveAspectRatio="${fit}" clip-path="url(#${id})"/>`
+          if (gn > 1 && i === k - 1) {
             let g = ''
             for (let j = 1; j < gn; j++) g += s`M${x + (W * j) / gn},${y}v${H}M${x},${y + (H * j) / gn}h${W}`
             o += `<path d="${g}" stroke="#fff" stroke-opacity=".9"/>`
@@ -331,6 +350,26 @@ export function render(d: Diagram, theme?: string, materials = true): string {
         if (a !== 1 || b !== 0 || c !== 0 || dd !== 1)
           // coefficients keep 4 decimals; the template's 0.1px rounding is for coordinates
           o = s`<g transform="matrix(${[a, b, c, dd].map(v => v.toFixed(4)).join(' ')} ${n.x - a * n.x - c * n.y} ${n.y - b * n.x - dd * n.y})">` + o + '</g>'
+        box(L, T, n.w, n.h)
+        break
+      }
+      case 'magnify': {
+        const S = zoomSource(n), R = Math.min(n.w, n.h) / 2, round = n.attrs.lens !== 'square'
+        const lens = round ? circ(n.x, n.y, R) : rr(L, T, n.w, n.h, 4), id = `${P}k${clips++}`
+        o += `<clipPath id="${id}"><path d="${lens}"/></clipPath>`
+        if (S) {
+          // the same <image> as the source, cropped to the region by the viewBox
+          const f = frames(S), [rx, ry, rw, rh] = zoomRegion(n, S)
+          o += s`<g clip-path="url(#${id})"><svg x="${L}" y="${T}" width="${n.w}" height="${n.h}" viewBox="${rx * f.W} ${ry * f.H} ${rw * f.W} ${rh * f.H}" preserveAspectRatio="xMidYMid slice">` +
+            s`<image href="${esc(f.srcs[0])}" width="${f.W}" height="${f.H}" preserveAspectRatio="${f.fit}"/></svg></g>`
+        } else o += `<path d="${lens}" fill="${fill}"/>`
+        o += `<path d="${lens}" fill="none" stroke="${stroke}" stroke-width="2.5"/>`
+        if (round) {
+          // the handle of the glass, out of the lower right
+          const a = R * Math.SQRT1_2
+          o += s`<path d="M${n.x + a + 1},${n.y + a + 1}l${R * 0.5},${R * 0.5}" stroke="${stroke}" stroke-width="5" stroke-linecap="round"/>`
+          box(n.x + a, n.y + a, R * 0.6, R * 0.6)
+        }
         box(L, T, n.w, n.h)
         break
       }
@@ -467,6 +506,7 @@ export function render(d: Diagram, theme?: string, materials = true): string {
 
   // --- edges
   const drawEdge = (e: Edge) => {
+    if (isZoom(e)) return '' // drawn as zoom lines
     const color = e.attrs.color ? pair(e.attrs.color)[1] : th.edge
     if (e.fc) return fc(e, color)
     const p = e.pts.map(q => [...q] as [number, number])
@@ -595,6 +635,29 @@ export function render(d: Diagram, theme?: string, materials = true): string {
     taken.push(area(pick))
     return pick
   }
+  // zoom lines: the region's outline on the source image, and two lines out to the lens
+  const zooms = ns.filter(n => n.shape === 'magnify').map(n => {
+    const S = zoomSource(n)
+    if (!S) return ''
+    const fr = frames(S), [rx, ry, rw, rh] = zoomRegion(n, S), [a, b, c, dd] = imageMatrix(S.attrs)
+    const fx = fr.x0 + (fr.k - 1) * 6, fy = fr.y0 + (fr.k - 1) * 6 // front frame
+    const at = (u: number, v: number) => {
+      const px = fx + u * fr.W - S.x, py = fy + v * fr.H - S.y
+      return [S.x + a * px + c * py, S.y + b * px + dd * py]
+    }
+    const reg = [at(rx, ry), at(rx + rw, ry), at(rx + rw, ry + rh), at(rx, ry + rh)]
+    const [cx, cy] = reg.reduce((p, q) => [p[0] + q[0] / 4, p[1] + q[1] / 4], [0, 0])
+    const l = Math.hypot(n.x - cx, n.y - cy) || 1, px = -(n.y - cy) / l, py = (n.x - cx) / l // across the zoom direction
+    const along = (p: number[]) => p[0] * px + p[1] * py
+    const sorted = [...reg].sort((p, q) => along(p) - along(q))
+    const R = Math.min(n.w, n.h) / 2
+    const lens = n.attrs.lens === 'square'
+      ? [[n.x - n.w / 2, n.y - n.h / 2], [n.x + n.w / 2, n.y - n.h / 2], [n.x + n.w / 2, n.y + n.h / 2], [n.x - n.w / 2, n.y + n.h / 2]].sort((p, q) => along(p) - along(q))
+      : [[n.x - px * R, n.y - py * R], [n.x + px * R, n.y + py * R]]
+    const [lo, hi] = [lens[0], lens[lens.length - 1]], stroke = pair(n.color)[1]
+    return `<path d="M${reg.map(p => p.map(f).join(',')).join('L')}z" fill="none" stroke="${stroke}" stroke-width="2" stroke-linejoin="round"/>` +
+      `<path d="M${sorted[0].map(f)}L${lo.map(f)}M${sorted[3].map(f)}L${hi.map(f)}" stroke="${stroke}" stroke-opacity=".75" stroke-dasharray="3 3"/>`
+  }).join('')
   const groups = d.groups.map(drawGroup).join('')
   const edges = d.edges.map(drawEdge).join('')
   const nodes = [...d.nodes.values()].map(drawNode).join('')
@@ -604,5 +667,5 @@ export function render(d: Diagram, theme?: string, materials = true): string {
   const m = 14, W = x1 - x0 + m * 2, H = y1 - y0 + m * 2
   const bg = th.bg !== 'none' ? s`<rect x="${x0 - m}" y="${y0 - m}" width="${W}" height="${H}" rx="10" fill="${th.bg}"/>` : ''
   return s`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0 - m} ${y0 - m} ${W} ${H}" width="${W}" height="${H}" font-family='${SANS}' style="max-width:100%;height:auto" role="img">` +
-    `<defs>${[...defs.values()].join('')}</defs>${bg}<g>${groups}</g><g>${edges}</g><g>${nodes}</g><g paint-order="stroke" stroke="${th.halo}" stroke-width="4" stroke-linejoin="round">${labels}</g></svg>`
+    `<defs>${[...defs.values()].join('')}</defs>${bg}<g>${groups}</g><g>${edges}</g><g>${nodes}</g><g>${zooms}</g><g paint-order="stroke" stroke="${th.halo}" stroke-width="4" stroke-linejoin="round">${labels}</g></svg>`
 }

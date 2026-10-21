@@ -54,13 +54,14 @@ All layers take `(label?, options?)` or `(options?)`.
 - Basic: `block` `thin` `text` `circle` `op('+' | '*' | '~')` `enc` `dec` `tensor({ size: [w,h,d] })` `stack({ n, size, offset })` `neurons({ n })` `vector(values)`
 - ML presets: `mha` `attention` `ffn` `mlp` `norm` `embed` `linear` `softmax` `matmul` `concat` `conv` `pool` `act` `dropout` `loss`
 - Functional: `add(...xs)` (⊕) and `mul(...xs)` (⊗) create a new node on each call.
+- Magnify: `magnify({ patch: [col, row] | region: [x, y, w, h], lens: 'circle' | 'square' })(img)`. Enlarges part of the image it's called on with a magnifying glass (`circle`, the default) or an inset (`square`). `patch` is one cell of the source's `grid`, and `region` is a range given as 0–1 fractions. It draws the range's outline and zoom lines instead of an arrow, and the enlarged part can feed the next block (e.g. Linear Projection).
 - 3D:
   - `gaussian({ peaks: [[x, y, amp?, sigma?]], mesh })`: a Gaussian or mixture surface.
   - `space({ points: [[x, y, z, class?]], axes })`: a 3D scatter on axis panes.
   - `sphere({ points })`: points on a hypersphere.
   - `pointcloud({ points: [[x, y, z, class?]], shape: 'torus' | 'sphere' | 'cube', n })`: a point cloud. Closer points are drawn larger and darker. When `points` is omitted, they're sampled from `shape`.
 - Signals: `waveform({ samples })`. `samples` takes raw audio in [-1, 1] (`number[]` or `Float32Array`). Long signals are reduced to at most 256 min/max columns, so the SVG stays light. When omitted, a synthetic speech-like waveform is drawn.
-- Images: `image(src, label?, { size, fit: 'cover' | 'contain', grid, n, tilt, rotate })`. `src` can be a URL, a data URL, an `<img>` or a `<canvas>`. `grid` draws a ViT-style patch grid, and `n` draws a batch of frames. `tilt` (degrees) turns the image around its vertical axis and draws it obliquely; a positive value sends the right edge back (up), a negative one the left; combined with `n`, it reads as a video volume. `rotate` (degrees) rotates it in-plane. The layout uses the transformed frame's bounding box.
+- Images: `image(src, label?, { size, fit: 'cover' | 'contain', grid, n, tilt, rotate })`. `src` can be a URL, a data URL, an `<img>` or a `<canvas>`. Passing an array (`image([t0, t1, t2])`) draws a stack of frames, each its own image, with the first one in front. `grid` draws a ViT-style patch grid, and `n` draws a batch of frames. `tilt` (degrees) turns the image around its vertical axis and draws it obliquely; a positive value sends the right edge back (up), a negative one the left; combined with `n`, it reads as a video volume. `rotate` (degrees) rotates it in-plane. The layout uses the transformed frame's bounding box.
 
 Common options: `color` `texture` `frozen` `train` `crossed` `dashed` `bold` `w` `h` `ghost` `caption` `id`
 

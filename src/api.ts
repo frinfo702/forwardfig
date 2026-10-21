@@ -72,6 +72,15 @@ export interface ImageOptions extends NodeOptions {
   /** degrees: rotate in-plane */
   rotate?: number
 }
+export interface MagnifyOptions extends NodeOptions {
+  /** region of the input image to enlarge: [x, y, w, h] as fractions of its frame */
+  region?: [number, number, number, number]
+  /** or one cell of the input image's patch grid: [column, row] */
+  patch?: [number, number]
+  /** 'circle' (default): a magnifying glass; 'square': an inset */
+  lens?: 'circle' | 'square'
+  size?: V2
+}
 export interface GaussianOptions extends NodeOptions {
   /** [x, y, amplitude?, sigma?] in [-1, 1]²; default one centered bump */
   peaks?: [number, number, number?, number?][]
@@ -188,7 +197,7 @@ const graphOf = (xs: Tensor[], who: string) => {
 // --- layers
 
 export type Shape = 'block' | 'thin' | 'text' | 'circle' | 'op' | 'enc' | 'dec' | 'tensor' | 'stack' | 'neurons'
-  | 'vector' | 'image' | 'gaussian' | 'space' | 'sphere' | 'pointcloud' | 'waveform'
+  | 'vector' | 'image' | 'magnify' | 'gaussian' | 'space' | 'sphere' | 'pointcloud' | 'waveform'
 
 export interface Layer<O extends NodeOptions = NodeOptions> {
   (...inputs: Tensor[]): Tensor
@@ -286,11 +295,18 @@ export function waveform(a?: string | WaveformOptions, b?: WaveformOptions): Lay
 
 export type ImageSource = string | { currentSrc?: string; src?: string } | { toDataURL(type?: string): string }
 /** A real image: URL, data URL, <img> or <canvas>. */
-export function image(src: ImageSource, a?: string | ImageOptions, b?: ImageOptions): Layer<ImageOptions> {
-  const href = typeof src === 'string' ? src : 'toDataURL' in src ? src.toDataURL('image/png') : src.currentSrc || src.src || ''
+/**
+ * A real image: URL, data URL, <img> or <canvas>. An array draws a stack of
+ * frames, the first one in front: image([t0, t1, t2], { tilt: 35 }).
+ */
+export function image(src: ImageSource | ImageSource[], a?: string | ImageOptions, b?: ImageOptions): Layer<ImageOptions> {
+  const href = (s: ImageSource) => typeof s === 'string' ? s : 'toDataURL' in s ? s.toDataURL('image/png') : s.currentSrc || s.src || ''
   const [label, o] = typeof a === 'string' ? [a, b ?? {}] : ['', a ?? {}]
-  return layer('image', label, { ...o, src: href } as ImageOptions)
+  const srcs = Array.isArray(src) ? src.map(href) : [href(src)]
+  return layer('image', label, { n: srcs.length > 1 ? srcs.length : undefined, ...o, src: srcs[0], ...(srcs.length > 1 && { srcs }) } as ImageOptions)
 }
+/** Enlarge part of the image it's called on, like a magnifying glass: magnify({ patch: [1, 2] })(img) */
+export const magnify = preset<MagnifyOptions>('magnify', '', 'orange')
 
 // functional ops: a fresh node per call, like torch.add
 export const add = (...xs: Tensor[]) => op('+')(...xs)

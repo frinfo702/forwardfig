@@ -221,7 +221,7 @@ fig.mount('#figure')</pre>
   "url": "https://arxiv.org/abs/2010.11929",
   "cite": "Dosovitskiy et al., An Image is Worth 16x16 Words (2021)",
   "fig": "Fig. 1",
-  "src": "const fig = new Figure({ flow: 'LR' })\n// a real image as a block; demoImage() returns a <canvas>, a URL or <img> works too\nconst img = fig.input(image(demoImage(), 'Image', { size: [56, 56], grid: 4 }))\nconst patches = stack('Patches', { n: 6, size: [16, 16], offset: 5 })(img)\nconst tokens = linear('Linear Projection\\nof Flattened Patches')(patches)\n\nconst sum = op('+')\nconst z = sum(tokens,\n  fig.input('Position\\nEmbedding', { below: sum }),\n  fig.input('[class]\\ntoken', { above: sum }))\nconst encoder = block('Transformer\\nEncoder', { color: 'orange', ghost: 3 })\ntext('Class')(mlp('MLP\\nHead')(encoder(z)))\nreturn fig"
+  "src": "const fig = new Figure({ flow: 'LR' })\n// a real image as a block; demoImage() returns a <canvas>, a URL or <img> works too\nconst img = fig.input(image(demoImage(), 'Image', { size: [56, 56], grid: 4 }))\n// one patch, pulled out with a magnifier and fed on\nconst patch = magnify('patch', { patch: [1, 1], size: [44, 44] })(img)\nconst tokens = linear('Linear Projection\\nof Flattened Patches')(patch)\n\nconst sum = op('+')\nconst z = sum(tokens,\n  fig.input('Position\\nEmbedding', { below: sum }),\n  fig.input('[class]\\ntoken', { above: sum }))\nconst encoder = block('Transformer\\nEncoder', { color: 'orange', ghost: 3 })\ntext('Class')(mlp('MLP\\nHead')(encoder(z)))\nreturn fig"
  },
  {
   "t": "Mixture of Experts",
@@ -357,7 +357,7 @@ fig.mount('#figure')</pre>
   "url": "https://arxiv.org/abs/2103.15691",
   "cite": "Arnab et al., ViViT: A Video Vision Transformer (2021)",
   "fig": "Fig. 1",
-  "src": "const fig = new Figure({ flow: 'LR' })\n// a clip of frames, tilted into depth like a video volume\nconst clip = fig.input(image(demoImage(), 'Input video', { size: [56, 56], n: 5, tilt: 35, grid: 4 }))\nconst tokens = linear('Tubelet\\nEmbedding')(clip)\nconst sum = op('+')\nconst z = sum(tokens, fig.input('Position\\nEmbedding', { below: sum }))\nconst encoder = block('Transformer\\nEncoder', { color: 'orange', ghost: 3 })\ntext('Class')(mlp('MLP\\nHead')(encoder(z)))\nreturn fig"
+  "src": "const fig = new Figure({ flow: 'LR' })\n// a clip of different frames (a slow pan), tilted into depth like a video volume\nconst frames = [0, 1, 2, 3, 4].map(t => demoImage(0, t * 0.06))\nconst clip = fig.input(image(frames, 'Input video', { size: [56, 56], tilt: 35, grid: 4 }))\nconst tokens = linear('Tubelet\\nEmbedding')(clip)\nconst sum = op('+')\nconst z = sum(tokens, fig.input('Position\\nEmbedding', { below: sum }))\nconst encoder = block('Transformer\\nEncoder', { color: 'orange', ghost: 3 })\ntext('Class')(mlp('MLP\\nHead')(encoder(z)))\nreturn fig"
  }
 ]</script>
 <script type="module">
@@ -370,11 +370,12 @@ fig.mount('#figure')</pre>
   const robin = new Image()
   robin.src = 'assets/robin.jpg'
   await robin.decode()
-  function demoImage(noise = 0, size = 96) {
+  // pan: shift the crop window right by this fraction (for video-like frames)
+  function demoImage(noise = 0, pan = 0, size = 96) {
     const c = document.createElement('canvas')
     c.width = c.height = size
-    const g = c.getContext('2d'), k = Math.min(robin.width, robin.height)
-    g.drawImage(robin, (robin.width - k) / 2, (robin.height - k) / 2, k, k, 0, 0, size, size)
+    const g = c.getContext('2d'), k = Math.min(robin.width, robin.height) * (1 - Math.min(pan, 0.5))
+    g.drawImage(robin, (robin.width - k) / 2 + pan * k * 0.5, (robin.height - k) / 2, k, k, 0, 0, size, size)
     if (noise) {
       const im = g.getImageData(0, 0, size, size), d = im.data
       let s = 7
@@ -398,7 +399,7 @@ fig.mount('#figure')</pre>
   const svgOf = code => build(code).svg({ theme: theme() })
   const root = document.documentElement
   const FIGS = JSON.parse($('figs').textContent)
-  const COMPONENTS = {"Basic": ["block('Block')", "thin('Thin')", "text('$\\\\mathbf{x}_t$')", "circle('$\\\\mathbf{z}$')", "op('+')", "op('*')", "op('~')", "enc('Encoder')", "dec('Decoder')", "tensor('$\\\\mathbf{X}$', { size: [36, 64, 20] })", "stack('Feature maps', { n: 4 })", "neurons('Layer', { n: 4 })", "vector(['0.22', '0.63', '0.15'])"], "ML presets": ["mha()", "attention()", "ffn()", "mlp()", "norm()", "embed()", "linear()", "softmax()", "matmul()", "concat()", "conv()", "pool()", "act()", "dropout()", "loss()"], "Signals": ["waveform('audio')", "pointcloud('point cloud')", "pointcloud('sphere', { shape: 'sphere' })", "pointcloud('cube', { shape: 'cube', n: 300 })"], "3D": ["gaussian('$p(\\\\mathbf{z})$')", "gaussian('mixture', { peaks: [[-0.45, -0.2, 1, 0.3], [0.5, 0.35, 0.7, 0.28]] })", "space('latent', { points: samplePoints })", "sphere('$\\\\mathbb{S}^2$', { points: samplePoints })"], "Images": ["image(demoImage(), 'image')", "image(demoImage(), 'patches', { grid: 4 })", "image(demoImage(), 'batch', { n: 3 })", "image(demoImage(0.6), 'noisy')", "image(demoImage(), 'tilted', { tilt: 35 })", "image(demoImage(), 'frames', { n: 4, tilt: 35 })", "image(demoImage(), 'rotated', { rotate: -12 })"]}
+  const COMPONENTS = {"Basic": ["block('Block')", "thin('Thin')", "text('$\\\\mathbf{x}_t$')", "circle('$\\\\mathbf{z}$')", "op('+')", "op('*')", "op('~')", "enc('Encoder')", "dec('Decoder')", "tensor('$\\\\mathbf{X}$', { size: [36, 64, 20] })", "stack('Feature maps', { n: 4 })", "neurons('Layer', { n: 4 })", "vector(['0.22', '0.63', '0.15'])"], "ML presets": ["mha()", "attention()", "ffn()", "mlp()", "norm()", "embed()", "linear()", "softmax()", "matmul()", "concat()", "conv()", "pool()", "act()", "dropout()", "loss()"], "Signals": ["waveform('audio')", "pointcloud('point cloud')", "pointcloud('sphere', { shape: 'sphere' })", "pointcloud('cube', { shape: 'cube', n: 300 })"], "Magnify": ["fig => magnify({ patch: [1, 1] })(fig.input(image(demoImage(), { grid: 4 })))", "fig => magnify({ region: [0.45, 0.2, 0.3, 0.3], lens: 'square' })(fig.input(image(demoImage())))", "fig => magnify({ patch: [2, 1], size: [48, 48] })(fig.input(image(demoImage(), { grid: 4, tilt: 35 })))"], "3D": ["gaussian('$p(\\\\mathbf{z})$')", "gaussian('mixture', { peaks: [[-0.45, -0.2, 1, 0.3], [0.5, 0.35, 0.7, 0.28]] })", "space('latent', { points: samplePoints })", "sphere('$\\\\mathbb{S}^2$', { points: samplePoints })"], "Images": ["image(demoImage(), 'image')", "image(demoImage(), 'patches', { grid: 4 })", "image(demoImage(), 'batch', { n: 3 })", "image(demoImage(0.6), 'noisy')", "image(demoImage(), 'tilted', { tilt: 35 })", "image(demoImage(), 'frames', { n: 4, tilt: 35 })", "image([0, 0.3, 0.6].map(v => demoImage(v)), 'different frames', { tilt: 35 })", "image(demoImage(), 'rotated', { rotate: -12 })"]}
   // a few labelled 3D points for the space / sphere samples
   const samplePoints = Array.from({ length: 30 }, (_, i) => {
     const c = i % 3, a = c * 2.1 + Math.sin(i * 7.1) * 0.3, b = 0.35 + Math.cos(i * 3.7) * 0.3
@@ -465,8 +466,11 @@ fig.mount('#figure')</pre>
       try { b.innerHTML = svgOf(FIGS[+b.dataset.i].src) } catch (e) { b.textContent = e.message }
     }
     $('components').innerHTML = Object.entries(COMPONENTS).map(([group, items]) => `<h3>${group}</h3><ul class="parts">${items.map(code => {
-      const f = new mm.Figure({ theme: theme() })
-      f.input(new Function(...Object.keys(scope), 'samplePoints', `return ${code}`)(...Object.values(scope), samplePoints))
+      const f = new mm.Figure({ theme: theme(), flow: 'LR' })
+      // an entry is a layer, or a `fig => ...` that builds a few blocks (for ones that need an input)
+      const made = new Function(...Object.keys(scope), 'samplePoints', `return ${code}`)(...Object.values(scope), samplePoints)
+      if (typeof made === 'function' && !made.shape) made(f)
+      else f.input(made)
       return `<li><div class="pic">${f.svg()}</div><code>${code.replace(/</g, '&lt;')}</code></li>`
     }).join('')}</ul>`).join('')
     $('swatches').innerHTML = TEXTURES.map(([t, use]) => {

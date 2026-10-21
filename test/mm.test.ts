@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { Figure, Module, Tensor, add, conv, ffn, figure, gaussian, image, mha, norm, op, space, sphere, text, thin, block, act, preset, configure, pointcloud, waveform, type Layer } from '../src/index'
+import { Figure, Module, Tensor, add, conv, ffn, figure, gaussian, image, mha, norm, op, space, sphere, text, thin, block, act, preset, configure, pointcloud, waveform, magnify, linear, type Layer } from '../src/index'
 import { layout } from '../src/layout'
 import { layoutLabel } from '../src/tex'
 
@@ -308,4 +308,22 @@ test('export: svg blob anywhere; raster formats need a browser', async () => {
   expect(await blob.text()).toStartWith('<svg')
   await expect(fig.toBlob({ format: 'png' })).rejects.toThrow('needs a browser')
   await expect(fig.toBlob({ format: 'pdf' as never })).rejects.toThrow('unknown format')
+})
+
+test('frames of different images, first one in front', () => {
+  const svg = figure({}, fig => { fig.input(image(['data:a', 'data:b', 'data:c'], { tilt: 30 })) }).svg()
+  const order = [...svg.matchAll(/<image href="data:(\w)"/g)].map(m => m[1])
+  expect(order).toEqual(['c', 'b', 'a']) // drawn back to front
+})
+
+test('magnify: lens crops the source region, zoom lines replace the arrow', () => {
+  const fig = new Figure({ flow: 'LR' })
+  const img = fig.input(image('data:x', { size: [80, 80], grid: 4 }))
+  const patch = magnify({ patch: [1, 2] })(img)
+  linear()(patch)
+  const svg = fig.svg()
+  expect(svg).toContain('viewBox="20 40 20 20"')      // column 1, row 2 of a 4×4 grid on 80px
+  expect(svg).toContain('stroke-dasharray="3 3"')     // zoom lines
+  const arrows = svg.match(/stroke-width="1.4" stroke-linecap="round"/g)!.length
+  expect(arrows).toBe(1)                               // only magnify → linear is an arrow
 })
