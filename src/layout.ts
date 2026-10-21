@@ -69,6 +69,7 @@ function size(n: Node, horiz: boolean, base: number, family: string) {
     case 'pointcloud': [w, h] = nums(n.attrs.size, [100, 84]); break
     case 'waveform': [w, h] = nums(n.attrs.size, [120, 44]); break
     case 'text': w = lb.w + 8; h = lb.h + 4; break
+    case 'empty': w = h = 0; break
     default: w = Math.max(lb.w + 30, 76); h = lb.h + 18
   }
   n.w = +n.attrs.w || w

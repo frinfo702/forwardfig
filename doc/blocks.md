@@ -31,6 +31,7 @@ vector(['$a$', '$b$', '$c$'], 'vector')(x)
 | `block` | A rounded block | — |
 | `thin` | A flat block (norms, activations) | — |
 | `text` | A label without a box | — |
+| `empty` | Empty space: an edge starts from or ends in it | — |
 | `circle` | A variable | — |
 | `op` | ⊕ `'+'`, ⊗ `'*'`, ∼ `'~'`, or any short label | — |
 | `enc` / `dec` | A trapezoid that narrows / widens along the flow | — |

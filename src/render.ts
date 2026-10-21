@@ -302,6 +302,7 @@ export function render(d: Diagram, theme?: string, materials = true): string {
         : text(n.label, n.x, n.y, size, 500, th.text, 'middle', ff)
     switch (n.shape) {
       case 'text': o = label(); break
+      case 'empty': break
       case 'op': {
         o = body(circ(n.x, n.y, 11), [n.x - 11, n.y - 11, 22, 22])
         const g = n.label === '+' ? s`M${n.x - 6.5},${n.y}h13M${n.x},${n.y - 6.5}v13`

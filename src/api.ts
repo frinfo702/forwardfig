@@ -234,7 +234,7 @@ const graphOf = (xs: Tensor[], who: string) => {
 
 // --- layers
 
-export type Shape = 'block' | 'thin' | 'text' | 'circle' | 'op' | 'enc' | 'dec' | 'tensor' | 'stack' | 'neurons'
+export type Shape = 'block' | 'thin' | 'text' | 'circle' | 'op' | 'enc' | 'dec' | 'tensor' | 'stack' | 'neurons' | 'empty'
   | 'vector' | 'matrix' | 'voxels' | 'image' | 'magnify' | 'gaussian' | 'space' | 'sphere' | 'pointcloud' | 'waveform'
 
 export interface Layer<O extends NodeOptions = NodeOptions> {
@@ -290,6 +290,8 @@ export const dec = preset('dec', 'Decoder', 'green')
 export const tensor = preset<TensorOptions>('tensor', '', 'blue')
 export const stack = preset<StackOptions>('stack', '', 'blue')
 export const neurons = preset<NeuronOptions>('neurons')
+/** Empty space: a point that draws nothing, for arrows that come from or go into the void. */
+export const empty = preset('empty')
 export function vector(values: string[], a?: string | NodeOptions, b?: NodeOptions): Layer<NodeOptions> {
   const [label, o] = typeof a === 'string' ? [a, b ?? {}] : ['', a ?? {}]
   return layer('vector', label, { ...o, values } as NodeOptions)

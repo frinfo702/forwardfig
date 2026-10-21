@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { Figure, Module, Tensor, add, conv, ffn, figure, gaussian, image, mha, norm, op, space, sphere, text, thin, block, act, preset, configure, pointcloud, waveform, magnify, linear, matrix, voxels, vector, circle, type Layer } from '../src/index'
+import { Figure, Module, Tensor, add, conv, ffn, figure, gaussian, image, mha, norm, op, space, sphere, text, thin, block, act, preset, configure, pointcloud, waveform, magnify, linear, matrix, voxels, vector, circle, empty, type Layer } from '../src/index'
 import { layout } from '../src/layout'
 import { layoutLabel } from '../src/tex'
 
@@ -533,4 +533,18 @@ test('layout: lanes are reordered when declaration order would cross edges', () 
   expect([x === a, y === c]).toEqual([true, true]) // chains stay straight
   // an explicit lane is never overridden, even when that leaves the crossing
   expect(crossings(build(1))).toBe(1)
+})
+
+test('empty(): a zero-size point that draws nothing, so edges start or end in empty space', () => {
+  const fig = new Figure()
+  empty()(block('M')(fig.input(empty())))
+  const d = layout(fig.diagram())
+  const voids = [...d.nodes.values()].filter(n => n.shape === 'empty')
+  expect(voids.map(n => [n.w, n.h])).toEqual([[0, 0], [0, 0]])
+  // edges end at the void's point
+  const out = d.edges.find(e => e.to === voids[1].id)!
+  expect(out.pts.at(-1)).toEqual([voids[1].x, voids[1].y])
+  const lone = new Figure()
+  lone.input(empty())
+  expect(lone.svg()).toContain('<g><g></g></g>')
 })
