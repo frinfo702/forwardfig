@@ -25,6 +25,7 @@ A review pass over the TypeScript API. Four changes break existing code; the [mi
 - `fig.input(layer, options)` adds `options` to the layer (they were ignored).
 - `ModuleOptions` takes `frozen` and `trainable`.
 - `Layer.shape` is typed as `Shape`.
+- A `forwardfig <file> [-o out.svg] [--theme dark]` command that writes a module's figures as SVG, for Makefile / LaTeX workflows. See [Export](export.md#command-line).
 
 ### Fixed
 
