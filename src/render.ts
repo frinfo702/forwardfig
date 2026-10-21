@@ -83,6 +83,8 @@ const utterance = (cols: number): number[][] =>
   })
 const CLASSES = ['blue', 'orange', 'green', 'purple', 'red', 'teal', 'pink', 'yellow']
 
+type CellData = { v?: number; c?: string; t?: string; l?: string; x?: boolean }
+
 let uid = 0
 
 export function render(d: Diagram, theme?: string, materials = true): string {
@@ -206,6 +208,16 @@ export function render(d: Diagram, theme?: string, materials = true): string {
     }
     return `url(#${P}${key})`
   }
+  // textures inside small cells: the vector looks only (baking WebGL per cell would be heavy)
+  const cellTexture = (t: string, d: string, color?: string) => {
+    if (PATTERN.has(t)) return `<path d="${d}" fill="${pattern(t, color)}"/>`
+    if (t === 'noise') return `<path d="${d}" fill="${pattern('grain', color)}"/>`
+    if (t === 'ice') { iceDefs(); return `<path d="${d}" fill="url(#${P}ice)"/><path d="${d}" fill="url(#${P}frost)"/>` }
+    if (t === 'magma') { fireDefs(); return `<path d="${d}" fill="url(#${P}fire)"/>` }
+    if (t === 'metal') return `<path d="${d}" fill="${metal()}"/>`
+    if (t === 'glass') return `<path d="${d}" fill="#fff" fill-opacity="${th.dark ? 0.15 : 0.45}"/>`
+    return ''
+  }
   const metal = () => {
     if (!defs.has('metal')) defs.set('metal', `<linearGradient id="${P}metal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e4e7eb"/><stop offset=".45" stop-color="#a7adb5"/><stop offset=".55" stop-color="#cfd3d8"/><stop offset="1" stop-color="#8d949d"/></linearGradient>`)
     return `url(#${P}metal)`
@@ -316,6 +328,35 @@ export function render(d: Diagram, theme?: string, materials = true): string {
           const t = -((k - 1) / 2) * 20 + i * 20
           { const cx = horiz ? n.x : n.x + t, cy = horiz ? n.y + t : n.y; o += body(circ(cx, cy, 7), [cx - 7, cy - 7, 14, 14]) }
         }
+        break
+      }
+      case 'matrix': case 'voxels': {
+        // cells: rect / parallelogram corners + its data; `shade` lightens the top face, darkens the side
+        const k = +n.attrs.cell || 16, cells: [number[][], CellData, number][] = []
+        if (n.shape === 'matrix') {
+          (JSON.parse(n.attrs.grid) as CellData[][]).forEach((row, r) => row.forEach((c, j) =>
+            cells.push([[[L + j * k, T + r * k], [L + (j + 1) * k, T + r * k], [L + (j + 1) * k, T + (r + 1) * k], [L + j * k, T + (r + 1) * k]], c, 0])))
+        } else {
+          const f = JSON.parse(n.attrs.faces) as Record<'front' | 'top' | 'side', CellData[][]>
+          const cols = +n.attrs.cols, dz = k * 0.5, x0 = L, y0 = T + +n.attrs.depth * dz
+          const top = (c: number, d: number) => [x0 + c * k + d * dz, y0 - d * dz], side = (r: number, d: number) => [x0 + cols * k + d * dz, y0 + r * k - d * dz]
+          f.top.forEach((row, d) => row.forEach((c, j) => cells.push([[top(j, d), top(j + 1, d), top(j + 1, d + 1), top(j, d + 1)], c, 0.3])))
+          f.side.forEach((row, r) => row.forEach((c, d) => cells.push([[side(r, d), side(r, d + 1), side(r + 1, d + 1), side(r + 1, d)], c, -0.25])))
+          f.front.forEach((row, r) => row.forEach((c, j) =>
+            cells.push([[[x0 + j * k, y0 + r * k], [x0 + (j + 1) * k, y0 + r * k], [x0 + (j + 1) * k, y0 + (r + 1) * k], [x0 + j * k, y0 + (r + 1) * k]], c, 0])))
+        }
+        const [c0, c1] = pair(n.color), gap = th.dark ? '#0e1117' : '#ffffff'
+        for (const [p, c, shade] of cells) {
+          let fill = c.c ? (th.c[c.c] ? mix(th.c[c.c][0], th.c[c.c][1], 0.55) : c.c) : mix(th.dark ? c1 : mix(c0, '#ffffff', 0.4), th.dark ? c0 : c1, th.dark ? 1 - (c.v ?? 0.5) : c.v ?? 0.5)
+          fill = shade > 0 ? mix(fill, '#ffffff', shade) : shade < 0 ? mix(fill, '#0b1a2e', -shade) : fill
+          const d = 'M' + p.map(q => q.map(f).join(',')).join('L') + 'z'
+          o += `<path d="${d}" fill="${fill}" stroke="${gap}" stroke-width="1.5" stroke-linejoin="round"/>`
+          if (c.t) o += cellTexture(c.t, d, c.c ?? n.color)
+          const [mx, my] = p.reduce((a, q) => [a[0] + q[0] / 4, a[1] + q[1] / 4], [0, 0])
+          if (c.l) o += text(c.l, mx, my, Math.min(base - 2, k * 0.6), 500, th.text)
+          if (c.x) o += cross(mx - k * 0.28, my - k * 0.28, mx + k * 0.28, my + k * 0.28, 1.4)
+        }
+        box(L, T, n.w, n.h)
         break
       }
       case 'vector': {

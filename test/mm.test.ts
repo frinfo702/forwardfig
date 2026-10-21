@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { Figure, Module, Tensor, add, conv, ffn, figure, gaussian, image, mha, norm, op, space, sphere, text, thin, block, act, preset, configure, pointcloud, waveform, magnify, linear, type Layer } from '../src/index'
+import { Figure, Module, Tensor, add, conv, ffn, figure, gaussian, image, mha, norm, op, space, sphere, text, thin, block, act, preset, configure, pointcloud, waveform, magnify, linear, matrix, voxels, type Layer } from '../src/index'
 import { layout } from '../src/layout'
 import { layoutLabel } from '../src/tex'
 
@@ -336,4 +336,21 @@ test('magnify: a picture of your own in the lens', () => {
   expect(svg).toContain('<image href="data:hires"')
   expect(svg).not.toContain('viewBox="0 0 16 16"') // no crop of the source
   expect(svg).toContain('stroke-dasharray="3 3"')  // zoom lines from the region stay
+})
+
+test('matrix and voxels: per-cell shade, color, texture, label, crossed', () => {
+  const m = matrix('attn', { cells: (r, c) => (r === c ? { value: 1, label: '1' } : c > r ? { color: 'gray', crossed: true } : (r + c) / 8) })
+  const v = voxels('feat', { rows: 3, cols: 4, depth: 2, cells: (r, c, d) => (d ? { texture: 'quantized' } : r / 2) })
+  const fig = new Figure({ flow: 'LR' })
+  v(m(fig.input('x')))
+  const d = layout(fig.diagram())
+  const [, mn, vn] = [...d.nodes.values()]
+  expect([mn.w, mn.h]).toEqual([80, 80])
+  expect([vn.w, vn.h]).toEqual([4 * 16 + 16, 3 * 16 + 16])
+  const faces = JSON.parse(vn.attrs.faces)
+  expect([faces.front.length, faces.top.length, faces.side[0].length]).toEqual([3, 2, 2])
+  const svg = fig.svg()
+  expect(svg.match(/stroke-width="1.5" stroke-linejoin="round"/g)!.length).toBe(25 + 12 + 8 + 6) // all cells drawn
+  expect(svg).toContain('p-quantized-blue')
+  expect(svg).not.toContain('NaN')
 })

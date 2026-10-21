@@ -84,6 +84,27 @@ export interface MagnifyOptions extends NodeOptions {
   fit?: 'cover' | 'contain'
   size?: V2
 }
+/**
+ * One cell of a matrix / voxels block: a number in [0, 1] is a shade of the block's
+ * color, a string is any color, an object can also set texture, label and crossed.
+ */
+export type Cell = number | string | { value?: number; color?: string; texture?: Texture; label?: string; crossed?: boolean }
+export interface MatrixOptions extends NodeOptions {
+  rows?: number
+  cols?: number
+  /** per cell, as rows of cells or (row, col) => cell; default: varied shades */
+  cells?: Cell[][] | ((r: number, c: number) => Cell)
+  /** cell size (px, default 16) */
+  cell?: number
+}
+export interface VoxelOptions extends NodeOptions {
+  rows?: number
+  cols?: number
+  depth?: number
+  /** per cell, (row, col, depth) => cell with depth 0 in front, or [row][col][depth]; default: varied shades */
+  cells?: Cell[][][] | ((r: number, c: number, d: number) => Cell)
+  cell?: number
+}
 export interface GaussianOptions extends NodeOptions {
   /** [x, y, amplitude?, sigma?] in [-1, 1]²; default one centered bump */
   peaks?: [number, number, number?, number?][]
@@ -200,7 +221,7 @@ const graphOf = (xs: Tensor[], who: string) => {
 // --- layers
 
 export type Shape = 'block' | 'thin' | 'text' | 'circle' | 'op' | 'enc' | 'dec' | 'tensor' | 'stack' | 'neurons'
-  | 'vector' | 'image' | 'magnify' | 'gaussian' | 'space' | 'sphere' | 'pointcloud' | 'waveform'
+  | 'vector' | 'matrix' | 'voxels' | 'image' | 'magnify' | 'gaussian' | 'space' | 'sphere' | 'pointcloud' | 'waveform'
 
 export interface Layer<O extends NodeOptions = NodeOptions> {
   (...inputs: Tensor[]): Tensor
@@ -315,6 +336,36 @@ export function image(src: ImageSource | ImageSource[], a?: string | ImageOption
 export function magnify(a?: string | MagnifyOptions, b?: MagnifyOptions): Layer<MagnifyOptions> {
   const [label, { src, ...o }] = typeof a === 'string' ? [a, b ?? {}] : ['', a ?? {}]
   return layer('magnify', label, { ...o, ...(src && { src: href(src) }) } as MagnifyOptions, 'magnify', { color: 'orange' })
+}
+
+// cells are evaluated here, so the figure stores plain data (only the visible ones for voxels)
+type CellData = { v?: number; c?: string; t?: Texture; l?: string; x?: boolean }
+const cellData = (c: Cell | undefined, seed: number): CellData =>
+  c === undefined ? { v: Math.abs(Math.sin(seed * 12.9898 + 4.1) * 43758.5453) % 1 }
+    : typeof c === 'number' ? { v: c } : typeof c === 'string' ? { c }
+      : { v: c.value, c: c.color, t: c.texture, l: c.label, x: c.crossed }
+
+/** A grid of cells, each with its own shade, color, texture or label. */
+export function matrix(a?: string | MatrixOptions, b?: MatrixOptions): Layer<MatrixOptions> {
+  const [label, { cells, ...o }] = typeof a === 'string' ? [a, b ?? {}] : ['', a ?? {}]
+  const rows = o.rows ?? (Array.isArray(cells) ? cells.length : 5), cols = o.cols ?? (Array.isArray(cells) ? Math.max(...cells.map(r => r.length)) : 5)
+  const at = (r: number, c: number) => (typeof cells === 'function' ? cells(r, c) : cells?.[r]?.[c])
+  const grid = Array.from({ length: rows }, (_, r) => Array.from({ length: cols }, (_, c) => cellData(at(r, c), r * 31 + c)))
+  return layer('matrix', label, { ...o, rows, cols, grid } as MatrixOptions, 'matrix', { color: 'blue' })
+}
+
+/** A block of voxels seen from the front, top and right, each cell with its own look. */
+export function voxels(a?: string | VoxelOptions, b?: VoxelOptions): Layer<VoxelOptions> {
+  const [label, { cells, ...o }] = typeof a === 'string' ? [a, b ?? {}] : ['', a ?? {}]
+  const rows = o.rows ?? 5, cols = o.cols ?? 5, depth = o.depth ?? 5
+  const at = (r: number, c: number, d: number) => cellData(typeof cells === 'function' ? cells(r, c, d) : cells?.[r]?.[c]?.[d], r * 97 + c * 31 + d * 7)
+  const face = (n: number, m: number, f: (i: number, j: number) => CellData) => Array.from({ length: n }, (_, i) => Array.from({ length: m }, (_, j) => f(i, j)))
+  const faces = {
+    front: face(rows, cols, (r, c) => at(r, c, 0)),
+    top: face(depth, cols, (d, c) => at(0, c, d)),
+    side: face(rows, depth, (r, d) => at(r, cols - 1, d)),
+  }
+  return layer('voxels', label, { ...o, rows, cols, depth, faces } as VoxelOptions, 'voxels', { color: 'blue' })
 }
 
 // functional ops: a fresh node per call, like torch.add
