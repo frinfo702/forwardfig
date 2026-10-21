@@ -405,7 +405,8 @@ export function layout(d: Diagram) {
       const a = d.nodes.get(e.from)!, b = d.nodes.get(e.to)!
       if (b.groups.some(x => !a.groups.includes(x))) {
         const first = Math.min(...[...rc.values()].filter(r => r.u - r.hu > s0 + 1 && r.u < T.u && r.v + r.hv > lo && r.v - r.hv < hi).map(r => r.u - r.hu))
-        if (first - GP + 6 - s0 > 6) g = first - GP + 6 - s0
+        // no block before T in the corridor: Math.min() of nothing is Infinity, keep the default gap
+        if (Number.isFinite(first) && first - GP + 6 - s0 > 6) g = first - GP + 6 - s0
       }
       const v = channel(side, s0 + g, T.u + T.hu, lo, hi)
       fin(e, [[s0, S.v], [s0 + g, S.v], [s0 + g, v], [T.u, v], [T.u, T.v + side * T.hv]])

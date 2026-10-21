@@ -420,6 +420,20 @@ test('a column that flows back up stays straight; side taps join as an L', () =>
   expect(tap.pts[2][1]).toBeCloseTo(node('up2').y)               // into the side
 })
 
+test('a skip into a group with nothing in the way keeps every coordinate finite', () => {
+  class G extends Module {
+    b = block('b')
+    forward(x: Tensor) { return this.b(x) }
+  }
+  const fig = new Figure({ flow: 'TB' })
+  const x = fig.input('x')
+  new G({ label: 'g' })(x.edge({ skip: true }))
+  block('far')(x)
+  const d = layout(fig.diagram())
+  for (const e of d.edges) for (const p of e.pts) expect(p.every(Number.isFinite)).toBe(true)
+  for (const g of d.groups) expect([g.x, g.y, g.w, g.h].every(Number.isFinite)).toBe(true)
+})
+
 test('two streams through a shared block both fold back up, whatever the search reaches first', () => {
   // each stream runs down (n → s → shared), turns, and runs back up (u1 → u2) beside itself
   const fig = new Figure({ flow: 'TB' })
