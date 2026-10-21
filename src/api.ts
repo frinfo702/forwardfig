@@ -96,6 +96,8 @@ export interface MatrixOptions extends NodeOptions {
   cells?: Cell[][] | ((r: number, c: number) => Cell)
   /** cell size (px, default 16) */
   cell?: number
+  /** names for the extent along each axis, e.g. { rows: '$T$', cols: '$d$' } */
+  axes?: { rows?: string; cols?: string }
 }
 export interface VoxelOptions extends NodeOptions {
   rows?: number
@@ -104,6 +106,8 @@ export interface VoxelOptions extends NodeOptions {
   /** per cell, (row, col, depth) => cell with depth 0 in front, or [row][col][depth]; default: varied shades */
   cells?: Cell[][][] | ((r: number, c: number, d: number) => Cell)
   cell?: number
+  /** names for the extent along each axis, e.g. { rows: 'H', cols: 'W', depth: 'C' } */
+  axes?: { rows?: string; cols?: string; depth?: string }
 }
 export interface GaussianOptions extends NodeOptions {
   /** [x, y, amplitude?, sigma?] in [-1, 1]²; default one centered bump */

@@ -356,6 +356,23 @@ export function render(d: Diagram, theme?: string, materials = true): string {
           if (c.l) o += text(c.l, mx, my, Math.min(base - 2, k * 0.6), 500, th.text)
           if (c.x) o += cross(mx - k * 0.28, my - k * 0.28, mx + k * 0.28, my + k * 0.28, 1.4)
         }
+        // axis names: cols under the front face, rows left of it, depth along the receding bottom edge
+        const axes: { rows?: string; cols?: string; depth?: string } = JSON.parse(n.attrs.axes ?? '{}')
+        if (n.attrs.axes) {
+          const rows = +n.attrs.rows, cols = +n.attrs.cols, dz = n.shape === 'voxels' ? +n.attrs.depth * k * 0.5 : 0
+          const fx = L, fy = T + dz, fw = cols * k, fh = rows * k, sz = base - 1
+          // edges meet the block's middle (n.y in LR, n.x in TB): keep the names off that line
+          const wired = d.edges.some(e => e.from === n.id || e.to === n.id)
+          let ry = fy + fh / 2, cx = fx + fw / 2
+          if (wired && horiz && Math.abs(ry - n.y) < sz * 0.85) ry = n.y + sz * 0.85
+          const cw = axes.cols ? layoutLabel(axes.cols, sz, 500).w : 0
+          if (wired && !horiz && Math.abs(cx - n.x) < cw / 2 + 6) cx = n.x + cw / 2 + 6
+          let t = ''
+          if (axes.cols) t += text(axes.cols, cx, fy + fh + sz * 0.9, sz, 500, th.sub)
+          if (axes.rows) t += text(axes.rows, fx - 5, ry, sz, 500, th.sub, 'end')
+          if (axes.depth && dz) t += text(axes.depth, fx + fw + dz / 2 + 5, fy + fh - dz / 2 + sz * 0.5, sz, 500, th.sub, 'start')
+          o += `<g paint-order="stroke" stroke="${th.halo}" stroke-width="3" stroke-linejoin="round">${t}</g>`
+        }
         box(L, T, n.w, n.h)
         break
       }

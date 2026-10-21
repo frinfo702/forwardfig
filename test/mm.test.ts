@@ -354,3 +354,11 @@ test('matrix and voxels: per-cell shade, color, texture, label, crossed', () => 
   expect(svg).toContain('p-quantized-blue')
   expect(svg).not.toContain('NaN')
 })
+
+test('matrix / voxels axis names', () => {
+  const svg = figure({}, fig => {
+    fig.input(voxels({ axes: { rows: 'H', cols: 'W', depth: 'C' } }))
+    fig.input(matrix({ rows: 2, cols: 3, axes: { cols: 'd' } }))
+  }).svg()
+  for (const a of ['H', 'W', 'C', 'd']) expect(svg).toContain(`>${a}</tspan>`)
+})
