@@ -75,6 +75,7 @@ Presets are a shape with a default label and color. Call them with no arguments 
 | `ghost` | `number` | Stacked copies behind the block, e.g. attention heads. |
 | `caption` | `string` | Small text under the block. |
 | `fontSize` | `number` | Label size in px. |
+| `fontFamily` | `string` | Label font (CSS font family). |
 
 Placement options (`lane`, `align`, `leftOf`, …) are on the [Layout](layout.md) page.
 

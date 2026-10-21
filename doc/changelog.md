@@ -20,11 +20,13 @@ A review pass over the TypeScript API. Four changes break existing code; the [mi
 
 ### Added
 
+- `style.fontFamily`: the figure's font (or one block's), with the same scoping as `fontSize`. Label widths are measured in it.
 - `figure(build)` without options.
 - `vector(values, label?, options?)` takes a label.
 - `fig.input(layer, options)` adds `options` to the layer (they were ignored).
 - `ModuleOptions` takes `frozen` and `trainable`.
 - `Layer.shape` is typed as `Shape`.
+- `FigureOptions.legend`: a key to the looks a figure uses (frozen, trainable, textures, crossed), under or beside it, with optional label overrides.
 - A `forwardfig <file> [-o out.svg] [--theme dark]` command that writes a module's figures as SVG, or as PNG / JPEG / WebP by the `-o` extension with the optional peer dependency `sharp` (`--scale`, `--background`), for Makefile / LaTeX workflows. See [Export](export.md#command-line).
 
 ### Fixed

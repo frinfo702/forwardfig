@@ -24,6 +24,10 @@ export interface Diagram {
   dir: Dir; theme: string; gap?: [number, number]
   /** base text size (px); blocks may set attrs.fontSize */
   fontSize?: number
+  /** base CSS font family; blocks may set attrs.fontFamily */
+  fontFamily?: string
+  /** a key to the looks the figure uses (frozen, trainable, textures, crossed); labels override the names */
+  legend?: { position?: 'bottom' | 'right'; labels?: Partial<Record<string, string>> }
   nodes: Map<string, Node>; edges: Edge[]; groups: Group[]; ranks: string[][]
 }
 
