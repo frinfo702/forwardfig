@@ -35,6 +35,17 @@
   .hero { padding:36px 0 44px; }
   .hero h1 { font:400 clamp(44px,8vw,92px)/.95 var(--serif); letter-spacing:-.025em; margin:0; max-width:11ch; }
   .hero p { max-width:58ch; color:var(--muted); margin:20px 0 32px; font-size:17px; }
+  .intro { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,400px); gap:40px; align-items:center; }
+  .install { background:var(--plate); border:1px solid var(--rule); border-radius:10px; padding:18px; margin-bottom:32px; }
+  .install h2 { font:600 13px/1 var(--sans); color:var(--muted); margin:0 0 12px; letter-spacing:.04em; text-transform:uppercase; }
+  .install .pms { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+  .install .pms button { padding:3px 10px; font-size:13px; }
+  .install .pms button[aria-pressed=true] { background:var(--ink); color:var(--plate); border-color:var(--ink); }
+  .install .cmd { display:flex; align-items:center; gap:10px; border:1px solid var(--rule); border-radius:6px; padding:8px 8px 8px 14px; font:14px var(--mono); }
+  .install .cmd code { flex:1; overflow-x:auto; white-space:nowrap; }
+  .install .cmd code::before { content:"$ "; color:var(--muted); }
+  .install .cmd button { padding:3px 10px; font:12px var(--sans); }
+  @media (max-width: 860px) { .intro { grid-template-columns:minmax(0,1fr); gap:0; } }
   .bench { display:grid; grid-template-columns:minmax(0,5fr) minmax(0,7fr); background:var(--plate); border:1px solid var(--rule); border-radius:10px; overflow:hidden; }
   .bench textarea { min-height:420px; border:0; border-right:1px solid var(--rule); background:transparent; color:var(--ink); font:13px/1.65 var(--mono); padding:18px 20px; min-height:380px; resize:vertical; tab-size:2; }
   .bench textarea:focus-visible { outline:none; box-shadow:inset 0 0 0 2px var(--ice); }
@@ -109,8 +120,19 @@
   </div>
 
   <section class="hero">
+    <div class="intro">
+    <div>
     <h1>Write the figure, not the drawing.</h1>
     <p>Describe the model the way you would write it in PyTorch: layers are callables, modules have a <code>forward</code>, and a figure draws whatever they produce. Edges stay straight, the shapes are the ones papers use, labels take TeX, and frozen or trainable weights render as ice or magma. One file, no dependencies.</p>
+    </div>
+    <aside class="install" aria-labelledby="install-h">
+      <h2 id="install-h">Install</h2>
+      <div class="pms" role="group" aria-label="Package manager">
+        <button type="button" aria-pressed="true" data-cmd="npm install forwardfig">npm</button><button type="button" aria-pressed="false" data-cmd="pnpm add forwardfig">pnpm</button><button type="button" aria-pressed="false" data-cmd="yarn add forwardfig">yarn</button><button type="button" aria-pressed="false" data-cmd="bun add forwardfig">bun</button><button type="button" aria-pressed="false" data-cmd="deno add npm:forwardfig">deno</button>
+      </div>
+      <div class="cmd"><code id="install-cmd">npm install forwardfig</code><button type="button" id="install-copy">Copy</button></div>
+    </aside>
+    </div>
     <div class="bench">
       <textarea id="src" spellcheck="false" aria-label="Figure code">class EncoderLayer extends Module {
   attn = mha()
@@ -506,6 +528,16 @@ fig.mount('#figure')</pre>
   }
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (!root.dataset.theme) drawAll() })
   drawAll()
+  // install card: pick a package manager, copy its command
+  const pms = document.querySelectorAll('.pms button')
+  pms.forEach(b => b.onclick = () => {
+    pms.forEach(o => o.setAttribute('aria-pressed', String(o === b)))
+    $('install-cmd').textContent = b.dataset.cmd
+    $('install-copy').textContent = 'Copy'
+  })
+  $('install-copy').onclick = async () => {
+    try { await navigator.clipboard.writeText($('install-cmd').textContent); $('install-copy').textContent = 'Copied' } catch { $('install-copy').textContent = 'Copy failed' }
+  }
 </script>
 </body>
 </html>
