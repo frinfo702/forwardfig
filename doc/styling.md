@@ -56,7 +56,7 @@ WebGL textures are baked once per block size and embedded as images. Without Web
 
 ```ts
 configure({ style: { fontSize: 14 }, kinds: { mha: { color: 'purple' } } })  // whole library
-new Figure({ style: { color: 'gray' } })                                    // this figure
+new Figure({ style: { color: 'gray', fontFamily: 'Times New Roman, serif' } }) // this figure
 new Encoder({ style: { fontSize: 11, texture: 'glass' } })                  // blocks made inside this module
 block('x', { fontSize: 20 })                                                // the block itself
 configure(null)                                                             // reset
@@ -64,6 +64,6 @@ configure(null)                                                             // r
 
 Precedence, strongest first: the block's own options › inner module › outer module › figure › `configure()` › the preset's defaults.
 
-- `style` can set `color`, `texture`, `fontSize`, `dashed` and `bold`. At the figure and `configure` level, `fontSize` also sizes edge labels, group titles and captions.
+- `style` can set `color`, `texture`, `fontSize`, `fontFamily`, `dashed` and `bold`. At the figure and `configure` level, `fontSize` also sizes edge labels, group titles and captions, and `fontFamily` (any CSS font family) sets the font of the whole figure, e.g. to match a paper's body text. Math (`$...$`) keeps its TeX font.
 - A texture set through `style` never hides `freeze()` / `trainable()`; a texture on the block itself does.
 - `configure` also takes `theme`, `flow`, `gap`, `materials` and `tex`. It returns a copy of the current config.

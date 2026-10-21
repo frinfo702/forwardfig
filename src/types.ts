@@ -24,6 +24,8 @@ export interface Diagram {
   dir: Dir; theme: string; gap?: [number, number]
   /** base text size (px); blocks may set attrs.fontSize */
   fontSize?: number
+  /** base CSS font family; blocks may set attrs.fontFamily */
+  fontFamily?: string
   nodes: Map<string, Node>; edges: Edge[]; groups: Group[]; ranks: string[][]
 }
 
