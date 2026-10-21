@@ -8,7 +8,9 @@ export interface Run { t: string; x: number; dy: number; size: number; it: boole
 export interface TextBox { lines: Run[][]; widths: number[]; w: number; h: number; lh: number; size: number }
 
 type Style = { it?: boolean; b?: boolean; up?: boolean; text?: boolean; sans?: boolean; map?: (c: string) => string }
-type Glyph = { t: string; it: boolean; b: boolean; serif: boolean }
+// TeX atom classes, for the spacing between neighbours
+type Cls = 'ord' | 'bin' | 'rel' | 'punct' | 'open' | 'close'
+type Glyph = { t: string; it: boolean; b: boolean; serif: boolean; cls?: Cls }
 type Script = { sub?: Item[]; sup?: Item[] }
 type Item = Glyph | Script
 
@@ -19,7 +21,13 @@ const table = (s: string) => {
   return m
 }
 const GREEK = table('alpha α beta β gamma γ delta δ epsilon ϵ varepsilon ε zeta ζ eta η theta θ vartheta ϑ iota ι kappa κ lambda λ mu μ nu ν xi ξ pi π rho ρ sigma σ tau τ upsilon υ phi ϕ varphi φ chi χ psi ψ omega ω Gamma Γ Delta Δ Theta Θ Lambda Λ Xi Ξ Pi Π Sigma Σ Phi Φ Psi Ψ Omega Ω')
-const SYM = table('cdot · times × oplus ⊕ otimes ⊗ odot ⊙ to → rightarrow → leftarrow ← gets ← Rightarrow ⇒ leftrightarrow ↔ mapsto ↦ sum ∑ prod ∏ int ∫ infty ∞ partial ∂ nabla ∇ in ∈ notin ∉ sim ∼ approx ≈ propto ∝ leq ≤ le ≤ geq ≥ ge ≥ neq ≠ ne ≠ pm ± mp ∓ ldots … dots … cdots ⋯ vdots ⋮ mid | | ‖ ast ∗ star ⋆ circ ∘ bullet • forall ∀ exists ∃ emptyset ∅ cup ∪ cap ∩ subset ⊂ subseteq ⊆ top ⊤ perp ⊥ langle ⟨ rangle ⟩ ell ℓ hbar ℏ dagger † prime ′ { { } } % % _ _ # # & & $ $')
+const SYM = table('cdot · times × oplus ⊕ otimes ⊗ odot ⊙ to → rightarrow → leftarrow ← gets ← Rightarrow ⇒ leftrightarrow ↔ mapsto ↦ sum ∑ prod ∏ int ∫ infty ∞ partial ∂ nabla ∇ in ∈ notin ∉ sim ∼ approx ≈ propto ∝ leq ≤ le ≤ geq ≥ ge ≥ neq ≠ ne ≠ pm ± mp ∓ ldots … dots … cdots ⋯ vdots ⋮ mid ∣ | ‖ ast ∗ star ⋆ circ ∘ bullet • forall ∀ exists ∃ emptyset ∅ cup ∪ cap ∩ subset ⊂ subseteq ⊆ top ⊤ perp ⊥ langle ⟨ rangle ⟩ ell ℓ hbar ℏ dagger † prime ′ { { } } % % _ _ # # & & $ $')
+const CLS: Record<string, Cls> = {}
+for (const c of '+−×·±∓⊕⊗⊙∘∗⋆∪∩') CLS[c] = 'bin'
+for (const c of '=<>≤≥≠≈∼∝∈∉⊂⊆→←⇒↔↦∣') CLS[c] = 'rel'
+for (const c of ',;') CLS[c] = 'punct'
+for (const c of '([⟨') CLS[c] = 'open'
+for (const c of ')]⟩') CLS[c] = 'close'
 const OPS = new Set('log exp ln sin cos tanh max min arg argmax argmin softmax lim det tr sup inf Pr KL diag sign'.split(' '))
 const ACCENT = table('hat ̂ widehat ̂ tilde ̃ widetilde ̃ bar ̄ overline ̅ dot ̇ ddot ̈ vec ⃗')
 const SPACE = table(',   :   ;   quad   qquad    ! ​')
@@ -38,8 +46,11 @@ const IGNORE = new Set('left right big Big bigl bigr Bigl Bigr displaystyle'.spl
 
 function parseMath(s: string): Item[] {
   let i = 0
-  const glyph = (t: string, st: Style, letter = false): Glyph =>
-    ({ t, it: letter && !st.up, b: !!st.b, serif: !st.sans })
+  const glyph = (t: string, st: Style, letter = false): Glyph => {
+    if (st.text) return { t, it: false, b: !!st.b, serif: !st.sans }
+    if (t === '-') t = '−' // a math minus, not a hyphen
+    return { t, it: letter && !st.up, b: !!st.b, serif: !st.sans, cls: CLS[t] }
+  }
   function seq(st: Style, stop?: string): Item[] {
     const out: Item[] = []
     while (i < s.length) {
@@ -128,25 +139,44 @@ export function layoutLabel(label: string, size: number, weight = 400): TextBox 
   for (const line of label.split(/\n|\\\\|<br\s*\/?>/)) {
     const runs: Run[] = []
     let x = 0
-    const place = (items: Item[], dy: number, sz: number) => {
+    // top: the main math line, where TeX puts space around binary operators and
+    // relations (it doesn't inside scripts)
+    const place = (items: Item[], dy: number, sz: number, top = false) => {
+      let prev: Cls | '' = '', italic = false, lastChar = ''
       for (const it of items) {
         if ('t' in it) {
+          let cls = it.cls ?? 'ord'
+          if (cls === 'bin' && (!prev || prev === 'bin' || prev === 'rel' || prev === 'open' || prev === 'punct')) cls = 'ord' // unary
+          let gap = 0
+          if (top && prev && cls !== 'punct' && cls !== 'close' && prev !== 'open') {
+            if ((cls === 'rel') !== (prev === 'rel')) gap = 5 / 18
+            else if (cls === 'bin' || prev === 'bin') gap = 4 / 18
+            else if (prev === 'punct') gap = 3 / 18
+          }
+          // italic correction: an italic glyph's top leans into an upright neighbour
+          if (italic && !it.it && cls !== 'punct') gap += 0.08
+          x += gap * sz
           const w = measure(it.t, font(sz, it.it, it.b || (it.serif ? false : weight), it.serif), sz)
-          const prev = runs[runs.length - 1]
-          if (prev && prev.dy === dy && prev.size === sz && prev.it === it.it && prev.b === it.b && prev.serif === it.serif) prev.t += it.t
+          const last = runs[runs.length - 1]
+          if (!gap && last && last.dy === dy && last.size === sz && last.it === it.it && last.b === it.b && last.serif === it.serif) last.t += it.t
           else runs.push({ t: it.t, x, dy, size: sz, it: it.it, b: it.b, serif: it.serif })
           x += w
+          prev = cls
+          italic = it.it
+          lastChar = it.t.slice(-1)
         } else {
           const x0 = x, ss = sz * 0.7
           let x1 = x0, x2 = x0
-          if (it.sup) { place(it.sup, dy - sz * 0.38, ss); x1 = x; x = x0 }
+          // superscripts sit past the base's italic overhang; subscripts tuck under it
+          if (it.sup) { x = x0 + (italic ? (lastChar === 'f' ? 0.2 : 0.08) * sz : 0); place(it.sup, dy - sz * 0.38, ss); x1 = x; x = x0 }
           if (it.sub) { place(it.sub, dy + sz * 0.24, ss); x2 = x }
-          x = Math.max(x1, x2)
+          x = Math.max(x1, x2) + 0.06 * sz // TeX's \scriptspace
+          italic = false
         }
       }
     }
     line.split('$').forEach((part, k) => {
-      if (k % 2) place(parseMath(part), 0, size * 1.1)
+      if (k % 2) place(parseMath(part), 0, size * 1.1, true)
       else if (part) place([{ t: part, it: false, b: false, serif: false }], 0, size)
     })
     lines.push(runs)

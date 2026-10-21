@@ -205,3 +205,15 @@ test('fontSize changes block size and label size', () => {
   expect(w(big)).toBeGreaterThan(w(small))
   expect(figure({ style: { fontSize: 18 } }, fig => { block('a')(fig.input('x').edge('lbl')) }).svg()).toContain('font-size="17"')
 })
+
+test('tex spacing: math minus, space around relations and binary ops, none in scripts', () => {
+  const [run] = layoutLabel('$x_{t-1}$', 13).lines
+  expect(run.some(r => r.t.includes('−'))).toBe(true)
+  const w = (s: string) => layoutLabel(s, 13).w
+  expect(w('$a=b$')).toBeGreaterThan(w('$ab$') + 13 * 1.1 * 0.5)   // = plus two thick spaces
+  expect(w('$a+b$')).toBeGreaterThan(w('$a$') * 2)
+  expect(w('$-a$')).toBeLessThan(w('$b-a$'))                     // unary minus gets no space
+  const sub = layoutLabel('$x_{a=b}$', 13).w, flat = layoutLabel('$x_{ab}$', 13).w
+  expect(sub - flat).toBeLessThan(13 * 0.7 * 1.1)                 // scripts stay tight
+  expect(layoutLabel('$\\text{a-b}$', 13).lines[0].some(r => r.t.includes('-'))).toBe(true)
+})
