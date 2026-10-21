@@ -160,4 +160,4 @@ The layout and rendering engine is independent of the API above. `fig.diagram()`
 
 To develop locally: run `bun install && bun test && bun run build`, then `python3 -m http.server` and open `demo/`. `bun run docs:dev` builds the docs in `doc/` and serves them at http://localhost:4321. Pushing to `main` deploys the demo to GitHub Pages.
 
-Known limits: crossings are not minimized (declaration order decides the result). TeX is a subset. Edge labels are not checked for collisions.
+Known limits: crossings are not minimized (declaration order decides the result). TeX is a subset.

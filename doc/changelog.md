@@ -43,6 +43,7 @@ A review pass over the TypeScript API. Four changes break existing code; the [mi
 | A `"` in an image URL or a color broke out of the attribute | Attribute values are escaped; CSS colors stay out of SVG ids |
 | Changing what `configure()` returned changed the global config | It returns a copy |
 | An edge `color` that was a CSS color name was ignored | It is used as given |
+| Edge labels could sit on blocks, other edges or each other | A label takes the first free spot: the other side, another segment, or shifted along it |
 
 ### Migration
 
