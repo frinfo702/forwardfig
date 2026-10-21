@@ -79,6 +79,9 @@ export interface MagnifyOptions extends NodeOptions {
   patch?: [number, number]
   /** 'circle' (default): a magnifying glass; 'square': an inset */
   lens?: 'circle' | 'square'
+  /** what the lens shows; default: the region cropped from the input image */
+  src?: ImageSource
+  fit?: 'cover' | 'contain'
   size?: V2
 }
 export interface GaussianOptions extends NodeOptions {
@@ -299,14 +302,20 @@ export type ImageSource = string | { currentSrc?: string; src?: string } | { toD
  * A real image: URL, data URL, <img> or <canvas>. An array draws a stack of
  * frames, the first one in front: image([t0, t1, t2], { tilt: 35 }).
  */
+const href = (s: ImageSource) => typeof s === 'string' ? s : 'toDataURL' in s ? s.toDataURL('image/png') : s.currentSrc || s.src || ''
 export function image(src: ImageSource | ImageSource[], a?: string | ImageOptions, b?: ImageOptions): Layer<ImageOptions> {
-  const href = (s: ImageSource) => typeof s === 'string' ? s : 'toDataURL' in s ? s.toDataURL('image/png') : s.currentSrc || s.src || ''
   const [label, o] = typeof a === 'string' ? [a, b ?? {}] : ['', a ?? {}]
   const srcs = Array.isArray(src) ? src.map(href) : [href(src)]
   return layer('image', label, { n: srcs.length > 1 ? srcs.length : undefined, ...o, src: srcs[0], ...(srcs.length > 1 && { srcs }) } as ImageOptions)
 }
-/** Enlarge part of the image it's called on, like a magnifying glass: magnify({ patch: [1, 2] })(img) */
-export const magnify = preset<MagnifyOptions>('magnify', '', 'orange')
+/**
+ * Enlarge part of the image it's called on, like a magnifying glass: magnify({ patch: [1, 2] })(img).
+ * `src` puts your own picture in the lens (e.g. a high-resolution crop) instead of the cropped region.
+ */
+export function magnify(a?: string | MagnifyOptions, b?: MagnifyOptions): Layer<MagnifyOptions> {
+  const [label, { src, ...o }] = typeof a === 'string' ? [a, b ?? {}] : ['', a ?? {}]
+  return layer('magnify', label, { ...o, ...(src && { src: href(src) }) } as MagnifyOptions, 'magnify', { color: 'orange' })
+}
 
 // functional ops: a fresh node per call, like torch.add
 export const add = (...xs: Tensor[]) => op('+')(...xs)

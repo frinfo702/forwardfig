@@ -54,7 +54,7 @@ All layers take `(label?, options?)` or `(options?)`.
 - Basic: `block` `thin` `text` `circle` `op('+' | '*' | '~')` `enc` `dec` `tensor({ size: [w,h,d] })` `stack({ n, size, offset })` `neurons({ n })` `vector(values)`
 - ML presets: `mha` `attention` `ffn` `mlp` `norm` `embed` `linear` `softmax` `matmul` `concat` `conv` `pool` `act` `dropout` `loss`
 - Functional: `add(...xs)` (⊕) and `mul(...xs)` (⊗) create a new node on each call.
-- Magnify: `magnify({ patch: [col, row] | region: [x, y, w, h], lens: 'circle' | 'square' })(img)`. Enlarges part of the image it's called on with a magnifying glass (`circle`, the default) or an inset (`square`). `patch` is one cell of the source's `grid`, and `region` is a range given as 0–1 fractions. It draws the range's outline and zoom lines instead of an arrow, and the enlarged part can feed the next block (e.g. Linear Projection).
+- Magnify: `magnify({ patch: [col, row] | region: [x, y, w, h], lens: 'circle' | 'square' })(img)`. Enlarges part of the image it's called on with a magnifying glass (`circle`, the default) or an inset (`square`). `patch` is one cell of the source's `grid`, and `region` is a range given as 0–1 fractions. It draws the range's outline and zoom lines instead of an arrow, and the enlarged part can feed the next block (e.g. Linear Projection). The lens shows the source range cropped by default; `src` (URL, `<img>`, `<canvas>`, with `fit`) puts any other image in it, such as a high-resolution crop.
 - 3D:
   - `gaussian({ peaks: [[x, y, amp?, sigma?]], mesh })`: a Gaussian or mixture surface.
   - `space({ points: [[x, y, z, class?]], axes })`: a 3D scatter on axis panes.

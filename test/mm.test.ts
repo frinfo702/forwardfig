@@ -327,3 +327,13 @@ test('magnify: lens crops the source region, zoom lines replace the arrow', () =
   const arrows = svg.match(/stroke-width="1.4" stroke-linecap="round"/g)!.length
   expect(arrows).toBe(1)                               // only magnify → linear is an arrow
 })
+
+test('magnify: a picture of your own in the lens', () => {
+  const fig = new Figure({ flow: 'LR' })
+  const img = fig.input(image('data:x', { grid: 4 }))
+  magnify({ patch: [0, 0], src: 'data:hires' })(img)
+  const svg = fig.svg()
+  expect(svg).toContain('<image href="data:hires"')
+  expect(svg).not.toContain('viewBox="0 0 16 16"') // no crop of the source
+  expect(svg).toContain('stroke-dasharray="3 3"')  // zoom lines from the region stay
+})

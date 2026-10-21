@@ -357,7 +357,9 @@ export function render(d: Diagram, theme?: string, materials = true): string {
         const S = zoomSource(n), R = Math.min(n.w, n.h) / 2, round = n.attrs.lens !== 'square'
         const lens = round ? circ(n.x, n.y, R) : rr(L, T, n.w, n.h, 4), id = `${P}k${clips++}`
         o += `<clipPath id="${id}"><path d="${lens}"/></clipPath>`
-        if (S) {
+        if (n.attrs.src) {
+          o += s`<image href="${esc(n.attrs.src)}" x="${L}" y="${T}" width="${n.w}" height="${n.h}" preserveAspectRatio="${n.attrs.fit === 'contain' ? 'xMidYMid meet' : 'xMidYMid slice'}" clip-path="url(#${id})"/>`
+        } else if (S) {
           // the same <image> as the source, cropped to the region by the viewBox
           const f = frames(S), [rx, ry, rw, rh] = zoomRegion(n, S)
           o += s`<g clip-path="url(#${id})"><svg x="${L}" y="${T}" width="${n.w}" height="${n.h}" viewBox="${rx * f.W} ${ry * f.H} ${rw * f.W} ${rh * f.H}" preserveAspectRatio="xMidYMid slice">` +
