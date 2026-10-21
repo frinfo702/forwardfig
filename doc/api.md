@@ -3,12 +3,12 @@ title: API reference
 nav: API
 group: Reference
 order: 1
-description: Every export of machine-mermaid with its signature, grouped by role.
+description: Every export of forwardfig with its signature, grouped by role.
 ---
 
 # API reference
 
-Everything is a named export of `machine-mermaid`; the default export bundles them as one object.
+Everything is a named export of `forwardfig`; the default export bundles them as one object.
 
 ## Figure
 

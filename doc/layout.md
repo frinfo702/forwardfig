@@ -27,7 +27,7 @@ Placement is automatic. Blocks sit on a grid of ranks (the longest path from an 
 `ref` is a layer or a tensor.
 
 ```ts figure
-import { Figure, op, linear, block, mlp, text } from 'machine-mermaid'
+import { Figure, op, linear, block, mlp, text } from 'forwardfig'
 
 const fig = new Figure({ flow: 'LR' })
 const tokens = linear('Patch\nEmbedding')(fig.input('patches'))
@@ -59,7 +59,7 @@ Style an edge with `x.edge({...})` before the call, or add one outside `forward`
 - Crossings are not minimized: declaration order decides. Edge labels are not checked for collisions.
 
 ```ts figure
-import { Figure, block, text } from 'machine-mermaid'
+import { Figure, block, text } from 'forwardfig'
 
 const fig = new Figure({ flow: 'LR' })
 const xT = text('$\\mathbf{x}_T$'), xt = block('$\\mathbf{x}_t$'), x0 = text('$\\mathbf{x}_0$')

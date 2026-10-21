@@ -5,7 +5,7 @@ The documentation is written in the Markdown files in `doc/` and built into a st
 ```bash
 bun run docs:build   # doc/*.md -> doc/dist
 bun run docs:dev     # build, then serve doc/dist at http://localhost:4321
-DOCS_BASE=/machine-mermaid/docs/ bun run docs:build   # as deployed to GitHub Pages
+DOCS_BASE=/forwardfig/docs/ bun run docs:build   # as deployed to GitHub Pages
 ```
 
 ## Files

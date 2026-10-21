@@ -12,7 +12,7 @@ Every block factory takes `(label?, options?)` or `(options?)`. `image(src, …)
 ## Basic shapes
 
 ```ts figure
-import { Figure, block, thin, circle, op, enc, dec, tensor, stack, neurons, vector } from 'machine-mermaid'
+import { Figure, block, thin, circle, op, enc, dec, tensor, stack, neurons, vector } from 'forwardfig'
 
 const fig = new Figure({ flow: 'LR', gap: [40, 24] })
 let x = fig.input(block('block'))
@@ -83,7 +83,7 @@ Placement options (`lane`, `align`, `leftOf`, …) are on the [Layout](layout.md
 `preset(shape, label, colorOrDefaults)` defines a block type the way the built-ins are defined.
 
 ```ts figure
-import { Figure, preset } from 'machine-mermaid'
+import { Figure, preset } from 'forwardfig'
 
 const rmsnorm = preset('thin', 'RMSNorm', 'yellow')
 const moe = preset('block', 'MoE', { color: 'orange', ghost: 3, kind: 'moe' })

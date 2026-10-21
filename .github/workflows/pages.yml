@@ -25,14 +25,14 @@ jobs:
       # the docs site lives under /docs/ of the Pages site
       - run: bun run docs:build
         env:
-          DOCS_BASE: /machine-mermaid/docs/
+          DOCS_BASE: /forwardfig/docs/
       # demo/ imports ../dist/, so ship both and send / to the demo
       - run: |
           mkdir site
           cp -r demo dist site/
           cp -r doc/dist site/docs
           # bust the browser cache (Pages serves max-age=600) on every deploy
-          sed -i "s|../dist/machine-mermaid.js|../dist/machine-mermaid.js?v=${GITHUB_SHA::7}|" site/demo/index.html
+          sed -i "s|../dist/forwardfig.js|../dist/forwardfig.js?v=${GITHUB_SHA::7}|" site/demo/index.html
           echo '<!doctype html><meta http-equiv="refresh" content="0; url=demo/">' > site/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

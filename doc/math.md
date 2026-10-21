@@ -32,7 +32,7 @@ configure({ tex: t => adaptor.outerHTML(html.convert(t, { display: false })) }) 
 Without MathJax a small engine handles it — as on this site. It covers `^ _ \mathbf \mathrm \text \boldsymbol \mathcal \mathbb`, Greek letters, common symbols, `\hat \tilde \bar \vec`, and `\frac` (set as a/b), with TeX-like spacing. Force it with `configure({ tex: null })`.
 
 ```ts figure
-import { Figure, block, text } from 'machine-mermaid'
+import { Figure, block, text } from 'forwardfig'
 
 const fig = new Figure({ flow: 'LR' })
 const y = block('$\\mathrm{softmax}(QK^\\top/\\sqrt{d})V$')(fig.input('$\\mathbf{x}\\in\\mathbb{R}^{T\\times d}$'))
