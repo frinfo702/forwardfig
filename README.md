@@ -147,7 +147,7 @@ fig.svg()                                        // string (works in Node too)
 - Raster formats (png / jpeg / webp) need a browser (canvas). External image URLs inside are inlined as data URLs before export. JPEG gets a white background by default.
 - PDF isn't supported. For papers, an SVG export (vector) can go into LaTeX via Inkscape or `svg2pdf`.
 
-From the command line (e.g. in a Makefile), `npx forwardfig model.ts -o fig.svg` writes the module's default export (a `Figure`, or a function returning one). Without a default export, each exported `Figure` becomes `<name>.svg` in the `-o` directory. `--theme dark` picks the theme. `.ts` files need Node ≥ 22.6 (`NODE_OPTIONS=--experimental-strip-types` before 23.6) or Bun.
+From the command line (e.g. in a Makefile), `npx forwardfig model.ts -o fig.svg` writes the module's default export (a `Figure`, or a function returning one). The format follows the extension: `.svg`, or `.png` / `.jpg` / `.jpeg` / `.webp`, which need the optional peer dependency `sharp` (`npm i -D sharp`) and take `--scale` (default 2) and `--background`. Without a default export, each exported `Figure` becomes `<name>.svg` in the `-o` directory. `--theme dark` picks the theme. `.ts` files need Node ≥ 22.6 (`NODE_OPTIONS=--experimental-strip-types` before 23.6) or Bun.
 
 ## Drawing core
 
