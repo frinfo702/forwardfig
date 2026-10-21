@@ -217,3 +217,9 @@ test('tex spacing: math minus, space around relations and binary ops, none in sc
   expect(sub - flat).toBeLessThan(13 * 0.7 * 1.1)                 // scripts stay tight
   expect(layoutLabel('$\\text{a-b}$', 13).lines[0].some(r => r.t.includes('-'))).toBe(true)
 })
+
+test('tex: a conditional bar gets thin spaces, |x| does not', () => {
+  const w = (s: string) => layoutLabel(s, 13).w
+  expect(w('$a|b$')).toBeGreaterThan(w('$ab$') + w('$|$') + 13 * 1.1 * 0.25)
+  expect(w('$|x|$')).toBeLessThan(w('$x$') + 2 * w('$|$') + 13 * 1.1 * 0.1) // only the italic correction
+})

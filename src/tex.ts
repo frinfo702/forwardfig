@@ -9,7 +9,7 @@ export interface TextBox { lines: Run[][]; widths: number[]; w: number; h: numbe
 
 type Style = { it?: boolean; b?: boolean; up?: boolean; text?: boolean; sans?: boolean; map?: (c: string) => string }
 // TeX atom classes, for the spacing between neighbours
-type Cls = 'ord' | 'bin' | 'rel' | 'punct' | 'open' | 'close'
+type Cls = 'ord' | 'bin' | 'rel' | 'punct' | 'open' | 'close' | 'mid'
 type Glyph = { t: string; it: boolean; b: boolean; serif: boolean; cls?: Cls }
 type Script = { sub?: Item[]; sup?: Item[] }
 type Item = Glyph | Script
@@ -26,6 +26,8 @@ const CLS: Record<string, Cls> = {}
 for (const c of '+−×·±∓⊕⊗⊙∘∗⋆∪∩') CLS[c] = 'bin'
 for (const c of '=<>≤≥≠≈∼∝∈∉⊂⊆→←⇒↔↦∣') CLS[c] = 'rel'
 for (const c of ',;') CLS[c] = 'punct'
+// a bar between terms is almost always a conditional, p(x|y): give it \mid's thin spaces
+CLS['|'] = 'mid'
 for (const c of '([⟨') CLS[c] = 'open'
 for (const c of ')]⟩') CLS[c] = 'close'
 const OPS = new Set('log exp ln sin cos tanh max min arg argmax argmin softmax lim det tr sup inf Pr KL diag sign'.split(' '))
@@ -142,16 +144,19 @@ export function layoutLabel(label: string, size: number, weight = 400): TextBox 
     // top: the main math line, where TeX puts space around binary operators and
     // relations (it doesn't inside scripts)
     const place = (items: Item[], dy: number, sz: number, top = false) => {
-      let prev: Cls | '' = '', italic = false, lastChar = ''
+      let prev: Cls | '' = '', italic = false, lastChar = '', abs = false
       for (const it of items) {
         if ('t' in it) {
           let cls = it.cls ?? 'ord'
-          if (cls === 'bin' && (!prev || prev === 'bin' || prev === 'rel' || prev === 'open' || prev === 'punct')) cls = 'ord' // unary
+          const leading = !prev || prev === 'bin' || prev === 'rel' || prev === 'open' || prev === 'punct'
+          if (cls === 'bin' && leading) cls = 'ord' // unary minus
+          // |x|: a leading bar opens, the next one closes; any other bar is a conditional
+          else if (cls === 'mid' && (leading || abs)) { cls = abs ? 'close' : 'open'; abs = !abs }
           let gap = 0
           if (top && prev && cls !== 'punct' && cls !== 'close' && prev !== 'open') {
             if ((cls === 'rel') !== (prev === 'rel')) gap = 5 / 18
             else if (cls === 'bin' || prev === 'bin') gap = 4 / 18
-            else if (prev === 'punct') gap = 3 / 18
+            else if (prev === 'punct' || cls === 'mid' || prev === 'mid') gap = 3 / 18
           }
           // italic correction: an italic glyph's top leans into an upright neighbour
           if (italic && !it.it && cls !== 'punct') gap += 0.08
@@ -165,7 +170,8 @@ export function layoutLabel(label: string, size: number, weight = 400): TextBox 
           italic = it.it
           lastChar = it.t.slice(-1)
         } else {
-          const x0 = x, ss = sz * 0.7
+          // scripts at 0.72×, but never below 8.5px: small labels otherwise turn θ into a smudge
+          const x0 = x, ss = Math.max(sz * 0.72, Math.min(sz, 8.5))
           let x1 = x0, x2 = x0
           // superscripts sit past the base's italic overhang; subscripts tuck under it
           if (it.sup) { x = x0 + (italic ? (lastChar === 'f' ? 0.2 : 0.08) * sz : 0); place(it.sup, dy - sz * 0.38, ss); x1 = x; x = x0 }
