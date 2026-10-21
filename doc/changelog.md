@@ -25,6 +25,7 @@ A review pass over the TypeScript API. Four changes break existing code; the [mi
 - `fig.input(layer, options)` adds `options` to the layer (they were ignored).
 - `ModuleOptions` takes `frozen` and `trainable`.
 - `Layer.shape` is typed as `Shape`.
+- Layout reorders lanes to reduce edge crossings. Whole columns swap, so chains stay straight; an explicit `lane` never moves, and groups stay contiguous. Figures without crossings are unchanged.
 
 ### Fixed
 

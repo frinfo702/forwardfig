@@ -154,6 +154,54 @@ export function layout(d: Diagram) {
     lane.set(n.id, l)
   }
 
+  // --- crossings: swap neighbouring lanes (whole columns, so chains stay straight) while that
+  // strictly lowers the count. Lanes with an explicit `lane` or a block between lanes stay put,
+  // and no swap may put a block inside a group it is not in.
+  // ponytail: greedy adjacent swaps stop at a local minimum; barycenter sweeps if figures need more
+  const rkOf = (id: string) => rk(d.nodes.get(id)!)
+  const ge = d.edges.filter(e => inGrid.has(e.from) && inGrid.has(e.to) && !back.has(e) && !e.flags.has('skip') && rkOf(e.from) < rkOf(e.to))
+  // an edge runs down its source's lane and bends just before its target's rank
+  const at = (e: Edge, r: number) => lane.get(r < rkOf(e.to) ? e.from : e.to)!
+  const crossings = () => {
+    let c = 0
+    for (let i = 0; i < ge.length; i++)
+      for (let j = i + 1; j < ge.length; j++) {
+        const a = ge[i], b = ge[j], lo = Math.max(rkOf(a.from), rkOf(b.from)), hi = Math.min(rkOf(a.to), rkOf(b.to))
+        if (lo < hi && (at(a, lo) - at(b, lo)) * (at(a, hi) - at(b, hi)) < 0) c++
+      }
+    return c
+  }
+  const intruders = () => {
+    let c = 0
+    for (const g of d.groups) {
+      const mem = laid.filter(n => n.groups.includes(g.id))
+      if (!mem.length) continue
+      const ls = mem.map(n => lane.get(n.id)!), rs = mem.map(rk)
+      for (const n of laid) {
+        const l = lane.get(n.id)!, r = rk(n)
+        if (!n.groups.includes(g.id) && l >= Math.min(...ls) && l <= Math.max(...ls) && r >= Math.min(...rs) && r <= Math.max(...rs)) c++
+      }
+    }
+    return c
+  }
+  const fixed = new Set<number>()
+  for (const n of laid) {
+    const l = lane.get(n.id)!
+    if (n.attrs.lane !== undefined) fixed.add(l)
+    if (!Number.isInteger(l)) fixed.add(Math.floor(l)).add(Math.ceil(l))
+  }
+  const swap = (i: number) => { for (const [id, l] of lane) if (l === i || l === i + 1) lane.set(id, 2 * i + 1 - l) }
+  let best = crossings(), bad = best ? intruders() : 0
+  for (let pass = 0, better = true; best && better && pass < next; pass++) {
+    better = false
+    for (let i = 0; i + 1 < next && best; i++) {
+      if (fixed.has(i) || fixed.has(i + 1)) continue
+      swap(i)
+      const c = crossings(), b = c < best ? intruders() : Infinity
+      if (b <= bad) { best = c; bad = b; better = true } else swap(i)
+    }
+  }
+
   // --- coordinates: lane/rank sizes, extra room where group membership changes
   const nl = Math.max(0, ...[...lane.values()].map(Math.ceil)) + 1
   const nr = Math.max(0, ...laid.map(rk)) + 1
