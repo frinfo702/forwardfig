@@ -6,7 +6,8 @@ AlexNet and causal attention). Each snippet assumes the needed names are
 imported from `'forwardfig'` and ends with the figure built; in a file for the
 CLI, add `export default fig`. `src` stands for an image URL or data URL.
 
-Contents: Transformer · Mixture of Experts · ViT · U-Net · DDPM · LoRA · LLaVA
+Contents: Transformer · Mixture of Experts · ViT · U-Net · DDPM · LoRA · LLaVA ·
+PixDiT, compact · MM-DiT, folded
 
 ## Transformer — modules, repeat, side inputs placed by reference
 
@@ -186,4 +187,96 @@ fig.rank(Hv, Hq)
 
 const llm = block('Language Model $f_\\phi$', { w: 330, h: 56, lane: 0.5 }).freeze()
 text('Language Response $\\mathbf{X}_\\text{a}$', { lane: 0.5 })(llm(Hv, Hq))
+```
+
+## PixDiT, compact — a module stacked across the flow, ops as edge labels
+
+Shows: an LR figure whose modules are TB columns. Each module's blocks share
+one rank (`fig.rank(mm.tt, mm.c, mm.st)`) and are stacked by `lane`; edges
+between them are short vertical lines. AdaLN-Zero and Text Encoding are edge
+labels, not blocks. The straight node-for-node translation of the same graph
+was about 5 : 1; this one is about 2.4 : 1.
+
+```ts
+class MMDiT extends Module {
+  tt = block('Text Token', { color: 'green', lane: 0 })
+  c = block('Condition', { color: 'gray', lane: 1 })
+  st = block('Semantic Token', { color: 'blue', lane: 2 })
+  forward(text, t, patches) {
+    const c = this.c(t)
+    this.tt(text.edge('Text Encoding'), c.edge('AdaLN-Zero'))
+    return this.st(patches, c.edge('AdaLN-Zero'))
+  }
+}
+
+class PiT extends Module {
+  c = block('Condition', { color: 'gray', lane: 1 })
+  pt = block('Pixel Token', { color: 'blue', lane: 2 })
+  forward(semantic, pixels) {
+    return this.pt(pixels, this.c(semantic).edge('AdaLN-Zero'))
+  }
+}
+
+const fig = new Figure({ flow: 'LR' })
+const prompt = block('User Prompt')(fig.input(block('System Prompt', { lane: 0 })))
+const t = fig.input('Timestep Embedding', { lane: 1 })
+const img = fig.input(block('Noised Image', { lane: 2 }))
+const p16 = thin('16×16\nPatchify', { lane: 2 })(img)
+const p1 = thin('1×1 Patchify', { lane: 3 })(img)
+
+const mm = new MMDiT({ label: 'MM-DiT Blocks', repeat: '×N', repeatSide: 'bottom' })
+const st = mm(prompt, t, p16)
+const pit = new PiT({ label: 'PiT Blocks', repeat: '×M', repeatSide: 'bottom' })
+empty()(pit(st, p1))
+fig.rank(mm.tt, mm.c, mm.st).rank(pit.c, pit.pt)
+```
+
+## MM-DiT, folded — two streams down the middle and back up the sides
+
+Shows: each stream's attention half runs down an inner lane, turns at its ⊕,
+and its FFN half runs back up an outer lane; `fig.rank` pins every block on the
+way back to the block at the same height on the way down, and the output to the
+input. The shared condition MLP is on top (ranked with the inputs) so all its
+edges flow down. Modulation for the outer columns goes through invisible
+`empty` taps chained down the gutter (`lane: 0.5` / `2.5`) and enters from the
+side. Edge `color` per stream. Unfolded, this was about 1 : 1.5, with the modulation edges bunched in the middle;
+folded it is about 1.4 : 1 with no crossings. Needs forwardfig after 0.1.2 for
+the second stream to fold reliably.
+
+```ts
+const rmsnorm = preset('thin', 'RMSNorm', 'white')
+const mod = preset('thin', 'Scale & Shift', 'white')
+const gate = preset('thin', 'Gate', 'white')
+
+const fig = new Figure({ flow: 'TB' })
+const x1 = fig.input(block({ lane: 1, color: 'blue', w: 36, h: 24 }))
+const x2 = fig.input(block({ lane: 2, color: 'green', w: 36, h: 24 }))
+const m = mlp('MLP', { lane: 1.5, color: 'white' })
+const c = m(fig.input(block({ lane: 1.5, color: 'gray', w: 36, h: 24 })))
+fig.rank(x1, x2, m)
+const cond = side => c.edge({ color: 'gray', join: 'side', side })
+const attn = mha('Joint MHSA', { lane: 1.5, color: 'red' })
+
+const down = (x, lane, color) => {
+  const n1 = rmsnorm({ lane }), s1 = mod({ lane }), qkv = vector(['q', 'k', 'v'], { lane, color }), g1 = gate({ lane })
+  const h = qkv(s1(n1(x.edge({ color })), cond()).edge({ color }))
+  return { x, n1, s1, qkv, g1, h }
+}
+const up = (s, y, lane, color) => {
+  const side = lane ? 'right' : 'left'
+  const r1 = op('+', { lane })(s.g1(y.edge({ color }), cond(side)).edge({ color, join: 'side' }), s.x.edge({ color, side }))
+  const n2 = rmsnorm({ lane }), s2 = mod({ lane }), f = ffn('FFN', { lane, color: 'white' }), g2 = gate({ lane })
+  const gutter = lane ? 2.5 : 0.5
+  const t3 = empty({ lane: gutter })(c.edge({ color: 'gray', arrow: 'none' }))
+  const t2 = empty({ lane: gutter })(t3.edge({ color: 'gray', arrow: 'none' }))
+  const r2 = op('+', { lane })(g2(f(s2(n2(r1.edge({ color })), t2.edge({ color: 'gray' })).edge({ color })).edge({ color }), t3.edge({ color: 'gray' })).edge({ color }), r1.edge({ color, side }))
+  const out = empty({ lane })(r2.edge({ color }))
+  fig.rank(n2, s.g1).rank(s2, attn).rank(f, s.qkv).rank(g2, s.s1).rank(r2, s.n1).rank(out, s.x)
+  fig.rank(t2, s2).rank(t3, g2)
+}
+
+const a = down(x1, 1, 'blue'), b = down(x2, 2, 'green')
+const y = attn(a.h.edge({ color: 'blue' }), b.h.edge({ color: 'green' }))
+up(a, y, 0, 'blue')
+up(b, y, 3, 'green')
 ```

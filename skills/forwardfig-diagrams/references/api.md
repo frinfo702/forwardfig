@@ -93,7 +93,7 @@ crossings (a `lane` you set never moves).
 
 | Option (on a block) | What it does |
 | --- | --- |
-| `lane: n` | Cross-axis column. Fractions sit between columns (`1.5`) |
+| `lane: n` | Cross-axis column. Fractions sit between columns (`1.5`). Negative lanes come before lane 0 (from the release after 0.1.2; earlier versions throw) |
 | `align: ref` | Same column as `ref` |
 | `leftOf` / `rightOf` / `above` / `below: ref` | Next to `ref`, `dist` px apart (default 22). Removed from the grid |
 | `at: [x, y]` | Absolute position |
