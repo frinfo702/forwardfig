@@ -362,3 +362,23 @@ test('matrix / voxels axis names', () => {
   }).svg()
   for (const a of ['H', 'W', 'C', 'd']) expect(svg).toContain(`>${a}</tspan>`)
 })
+
+test('a column that flows back up stays straight; side taps join as an L', () => {
+  const fig = new Figure({ flow: 'TB' })
+  const x = fig.input('x'), c = fig.input('c')
+  const a = block('a'), b = block('b'), up1 = block('up1'), up2 = block('up2')
+  const cond = block('mlp')(c)
+  const y = b(a(x))
+  const z = up2(up1(y), cond.edge({ join: 'side', label: 'g' }))
+  fig.rank(a, up2); fig.rank(b, up1)
+  const out = text('out')(z)
+  fig.rank(out, x)
+  const d = layout(fig.diagram())
+  const node = (l: string) => [...d.nodes.values()].find(n => n.label === l)!
+  expect(node('up1').x).toBe(node('up2').x)                    // one column
+  const e = (f: string, t: string) => d.edges.find(e => e.from === node(f).id && e.to === node(t).id)!
+  expect(e('up1', 'up2').pts.length).toBe(2)                    // straight up, no U detour
+  const tap = e('mlp', 'up2')
+  expect(tap.pts.length).toBe(3)                                // an L
+  expect(tap.pts[2][1]).toBeCloseTo(node('up2').y)               // into the side
+})

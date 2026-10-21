@@ -154,6 +154,8 @@ export interface EdgeOptions {
   color?: string
   /** a ✕ on the edge: a cut connection */
   crossed?: boolean
+  /** 'side': come down the source's line and turn into the target's side (an L), e.g. conditioning taps */
+  join?: 'side'
 }
 
 // --- tensors and the trace graph
@@ -539,7 +541,7 @@ export class Figure {
     const edges: Edge[] = g.edges.map(({ from, to, style: s }) => ({
       from, to: g.id(to), label: s.label, pts: [],
       op: s.dense ? '=>' : s.arrow === 'none' ? (s.dashed ? '..' : '--') : s.arrow === 'both' ? '<->' : s.dashed ? '..>' : '->',
-      flags: new Set((['skip', 'curve', 'thick', 'dashed', 'crossed'] as const).filter(k => s[k])),
+      flags: new Set([...(['skip', 'curve', 'thick', 'dashed', 'crossed'] as const).filter(k => s[k]), ...(s.join ? ['join'] : [])]),
       attrs: { ...(s.side && { side: s.side }), ...(s.color && { color: s.color }) },
     }))
     return {

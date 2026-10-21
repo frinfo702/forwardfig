@@ -121,7 +121,8 @@ export function layout(d: Diagram) {
   // --- lanes
   const preds = new Map<string, Node[]>()
   for (const e of d.edges)
-    if (inGrid.has(e.from) && inGrid.has(e.to) && !back.has(e) && !e.flags.has('skip')) {
+    // side taps (join) and skips feed a block without deciding its column
+    if (inGrid.has(e.from) && inGrid.has(e.to) && !back.has(e) && !e.flags.has('skip') && !e.flags.has('join')) {
       if (!preds.has(e.to)) preds.set(e.to, [])
       preds.get(e.to)!.push(d.nodes.get(e.from)!)
     }
@@ -139,6 +140,12 @@ export function layout(d: Diagram) {
       } else for (const p of ps) {
         const pl = lane.get(p.id)!
         if (!claimed.has(p.id) && free(pl)) { l = pl; claimed.add(p.id); break }
+      }
+      // fed only by back edges (a column flowing against the flow): take the lane of what it feeds
+      if (l === undefined && !ps.length) for (const e of d.edges) {
+        if (e.from !== n.id || !back.has(e) || !lane.has(e.to) || claimed.has(e.to)) continue
+        const tl = lane.get(e.to)!
+        if (free(tl)) { l = tl; claimed.add(e.to); break }
       }
     }
     if (l === undefined || !free(l)) { while (!free(next)) next++; l = next }
@@ -242,6 +249,11 @@ export function layout(d: Diagram) {
     const s0 = S.u + S.hu, t0 = T.u - T.hu, mid = (s0 + t0) / 2
     const Z = (b: number): V[] => [[s0, ps], [b, ps], [b, pt], [t0, pt]]
     const cands: V[][] = Math.abs(ps - pt) < 0.5 ? [[[s0, pt], [t0, pt]]] : [Z(Math.max(mid, t0 - gapM / 2)), Z(Math.min(mid, s0 + gapM / 2))]
+    // join: 'side' → down the source's line, then into the target's facing side
+    if (e.flags.has('join') && Math.abs(ps - T.v) > T.hv) {
+      const k = ps > T.v ? 1 : -1
+      cands.unshift([[s0, ps], [T.u, ps], [T.u, T.v + k * T.hv]])
+    }
     return cands.find(c => !hit(c, e.from, e.to))
   }
   // edges that can't go direct even from their ideal ports detour, and must not
@@ -288,6 +300,20 @@ export function layout(d: Diagram) {
     if (ok) fin(p.e, ok, 1)
     else rest.push(p.e)
   }
+  // against the flow: straight, out of the side and up (L), or a Z, when the way is clear and
+  // no forward edge links the same pair (that one would be drawn over); otherwise the U below
+  const paired = (e: Edge) => d.edges.some(o => o !== e && ((o.from === e.from && o.to === e.to) || (o.from === e.to && o.to === e.from)))
+  for (let i = rest.length - 1; i >= 0; i--) {
+    const e = rest[i], S = rc.get(e.from)!, T = rc.get(e.to)!
+    if (e.from === e.to || e.flags.has('skip') || T.u + T.hu > S.u - S.hu - 2 || paired(e)) continue
+    const s0 = S.u - S.hu, t0 = T.u + T.hu, k = T.v > S.v ? 1 : -1, mid = (s0 + t0) / 2
+    const lo = Math.max(S.v - S.hv, T.v - T.hv) + 6, hi = Math.min(S.v + S.hv, T.v + T.hv) - 6
+    const cands: V[][] = []
+    if (lo <= hi) { const c = Math.min(hi, Math.max(lo, S.hv <= T.hv ? S.v : T.v)); cands.push([[s0, c], [t0, c]]) }
+    else cands.push([[S.u, S.v + k * S.hv], [S.u, T.v], [t0, T.v]], [[s0, S.v], [mid, S.v], [mid, T.v], [t0, T.v]])
+    const ok = cands.find(c => !hit(c, e.from, e.to))
+    if (ok) { fin(e, ok, 1); rest.splice(i, 1) }
+  }
   for (const e of rest) {
     const S = rc.get(e.from)!, T = rc.get(e.to)!
     const side = /^(left|top|-)/.test(e.attrs.side ?? '') ? -1 : 1
@@ -327,6 +353,7 @@ export function layout(d: Diagram) {
       const L = Math.hypot(e.pts[i + 1][0] - e.pts[i][0], e.pts[i + 1][1] - e.pts[i][1])
       if (L > best) { best = L; bi = i }
     }
+    if (e.flags.has('join') && e.pts.length === 3) bi = 1 // an L into a side: label where it arrives
     const [a, b] = [e.pts[bi], e.pts[bi + 1]], f = e.pts[0], l = e.pts[e.pts.length - 1]
     const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2
     if (Math.abs(a[1] - b[1]) < Math.abs(a[0] - b[0])) {

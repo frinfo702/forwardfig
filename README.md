@@ -87,7 +87,7 @@ Common options: `color` `texture` `frozen` `train` `crossed` `dashed` `bold` `w`
 - `freeze()` / `train()` can be called on a layer or on a module. On a module they apply to every block inside it, unless a layer is marked explicitly.
 - A 🧊 or 🔥 in a label works the same way.
 
-Edges (`x.edge({...})` / `fig.edge(a, b, {...})`): `label` `crossed` `dashed` `arrow: 'end' | 'both' | 'none'` `thick` `dense` (fully connected between `neurons`) `skip` `curve` `side` `color`
+Edges (`x.edge({...})` / `fig.edge(a, b, {...})`): `label` `crossed` `join: 'side'` (comes down the source's line and turns into the target's side, an L; for conditioning taps. It doesn't affect column assignment) `dashed` `arrow: 'end' | 'both' | 'none'` `thick` `dense` (fully connected between `neurons`) `skip` `curve` `side` `color`
 
 Labels: a newline (`\n`) starts a new line, and `$...$` is TeX.
 
@@ -149,7 +149,7 @@ fig.svg()                                        // string (works in Node too)
 
 The layout and rendering engine is independent of the API above. `fig.diagram()` returns plain `Diagram` data (nodes, edges, groups, ranks), which `draw(diagram, { theme })` turns into SVG. Anything that can generate a Diagram, from another language or as JSON, can reuse the same engine.
 
-- Layout: a grid of ranks (longest path) and lanes (a block inherits its first input's lane), so chains are always straight. Edges are orthogonal: straight, one Z bend, or a detour. When several arrows enter one block, the one that goes dead straight never moves, and on a small ⊕ the others join from the side.
+- Layout: a grid of ranks (longest path) and lanes (a block inherits its first input's lane), so chains are always straight. Edges against the flow (e.g. a column that goes back up, aligned with `fig.rank`) are drawn straight, as an L or as a Z when the path is clear. A block whose only inputs come against the flow inherits the lane of the block it feeds. Edges are orthogonal: straight, one Z bend, or a detour. When several arrows enter one block, the one that goes dead straight never moves, and on a small ⊕ the others join from the side.
 - Materials: 🧊 / 🔥 run the WebGL shaders from [portfolio](https://github.com/frinfo702/portfolio) once per block size and embed the result as an image. Without WebGL it falls back to a vector look, and `new Figure({ materials: false })` forces that fallback.
 - Text is measured with canvas `measureText` (cached). Without a DOM, a width-table approximation is used.
 
