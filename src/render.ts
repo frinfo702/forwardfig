@@ -1,5 +1,5 @@
 import type { Diagram, Edge, Group, Node } from './types'
-import { FS, OUTSIDE, nums, values } from './layout'
+import { FS, OUTSIDE, labelSize, nums, values } from './layout'
 import { bake, type Material } from './materials'
 import { SANS, SERIF, layoutLabel } from './tex'
 
@@ -68,7 +68,7 @@ let uid = 0
 export function render(d: Diagram, theme?: string, materials = true): string {
   const th = THEMES[theme ?? d.theme] ?? THEMES.light
   const P = `mm${uid++}-`
-  const horiz = d.dir === 'LR' || d.dir === 'RL'
+  const horiz = d.dir === 'LR' || d.dir === 'RL', base = d.fontSize ?? FS
   const defs = new Map<string, string>()
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
   const box = (x: number, y: number, w = 0, h = 0) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x + w); y1 = Math.max(y1, y + h) }
@@ -220,7 +220,7 @@ export function render(d: Diagram, theme?: string, materials = true): string {
     let o = ''
     // text on magma needs to be light, with a dark halo to stay readable over the cracks;
     // busy textures get a halo in the page color
-    const size = n.shape === 'thin' ? FS - 1 : FS
+    const size = labelSize(n, base)
     const [ink, halo] = fx === 'metal' ? ['#1d2430', '#e8ebee'] : [th.text, th.halo] // metal is light in both themes
     const label = () => baked && fx === 'magma'
       ? `<g paint-order="stroke" stroke="#1a0d07" stroke-width="3" stroke-linejoin="round">${text(n.label, n.x, n.y, size, 600, '#fff4e8')}</g>`
@@ -234,7 +234,7 @@ export function render(d: Diagram, theme?: string, materials = true): string {
         const g = n.label === '+' ? s`M${n.x - 6.5},${n.y}h13M${n.x},${n.y - 6.5}v13`
           : /^[*x×]$/.test(n.label) ? s`M${n.x - 4.6},${n.y - 4.6}l9.2,9.2M${n.x + 4.6},${n.y - 4.6}l-9.2,9.2`
             : n.label === '~' ? s`M${n.x - 7},${n.y}q3.5,-8 7,0t7,0` : ''
-        o += g ? `<path d="${g}" fill="none" stroke="${stroke}" stroke-width="1.5" stroke-linecap="round"/>` : text(n.label, n.x, n.y, FS, 500, th.text)
+        o += g ? `<path d="${g}" fill="none" stroke="${stroke}" stroke-width="1.5" stroke-linecap="round"/>` : text(n.label, n.x, n.y, size, 500, th.text)
         break
       }
       case 'var': o = body(circ(n.x, n.y, n.w / 2), [L, T, n.w, n.h]) + label(); break
@@ -280,7 +280,7 @@ export function render(d: Diagram, theme?: string, materials = true): string {
         vals.forEach((v, i) => {
           const c = -((vals.length - 1) / 2) * cell + i * cell
           if (i) o += horiz ? s`<path d="M${L + 3},${n.y + c - cell / 2}h${n.w - 6}" stroke="${stroke}" stroke-opacity=".5"/>` : s`<path d="M${n.x + c - cell / 2},${T + 3}v${n.h - 6}" stroke="${stroke}" stroke-opacity=".5"/>`
-          o += text(v.trim(), horiz ? n.x : n.x + c, horiz ? n.y + c : n.y, FS - 1, 500, th.text)
+          o += text(v.trim(), horiz ? n.x : n.x + c, horiz ? n.y + c : n.y, size, 500, th.text)
         })
         break
       }
@@ -347,11 +347,11 @@ export function render(d: Diagram, theme?: string, materials = true): string {
           const [x, y] = m(proj(p[0], p[1], p[2])), c = th.c[CLASSES[(p.length > 4 ? p[3] : 0) % CLASSES.length]][1]
           o += s`<circle cx="${x}" cy="${y}" r="3.2" fill="${c}" stroke="${th.dark ? '#0e1117' : '#fff'}" stroke-width=".9"/>`
         }
-        const lab = (t: string, x: number, y: number, z: number) => { const [a, b] = m(proj(x, y, z)); return text(t, a, b, FS - 2, 400, th.sub) }
+        const lab = (t: string, x: number, y: number, z: number) => { const [a, b] = m(proj(x, y, z)); return text(t, a, b, base - 2, 400, th.sub) }
         // z goes beside whichever vertical edge forms the left silhouette
         const [zx, zy] = [[xf, -yf], [-xf, yf]].sort((p, q) => m(proj(p[0], p[1], 0))[0] - m(proj(q[0], q[1], 0))[0])[0]
         const [zl, zt] = m(proj(zx, zy, 0))
-        o += lab(axes[0], 0, -yf * 1.22, -1) + lab(axes[1], -xf * 1.22, 0, -1) + text(axes[2], zl - 8, zt, FS - 2, 400, th.sub, 'end')
+        o += lab(axes[0], 0, -yf * 1.22, -1) + lab(axes[1], -xf * 1.22, 0, -1) + text(axes[2], zl - 8, zt, base - 2, 400, th.sub, 'end')
         box(L, T, n.w, n.h)
         break
       }
@@ -386,8 +386,8 @@ export function render(d: Diagram, theme?: string, materials = true): string {
         o = body(rr(L, T, n.w, n.h, r), undefined, r) + label()
       }
     }
-    if (OUTSIDE.has(n.shape) && n.label) o += text(n.label, n.x, T - (ghosts * 5) - 11, FS - 1, 500, th.sub)
-    if (n.attrs.caption) o += text(n.attrs.caption, n.x, n.y + n.h / 2 + 12, FS - 1, 400, th.sub)
+    if (OUTSIDE.has(n.shape) && n.label) o += text(n.label, n.x, T - (ghosts * 5) - 11, size, 500, th.sub)
+    if (n.attrs.caption) o += text(n.attrs.caption, n.x, n.y + n.h / 2 + 12, base - 1, 400, th.sub)
     const b = mark(n, fx)
     if (b) {
       const round = n.shape === 'op' || n.shape === 'var'
@@ -480,11 +480,11 @@ export function render(d: Diagram, theme?: string, materials = true): string {
     if (m) o += m + `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="1.2" stroke-opacity=".7"/>`
     else if (fx === 'ice') o += `<path d="${d}" fill="url(#${P}frost)"/>` + snow(g.x, g.y, g.w, 12)
     box(g.x, g.y, g.w, g.h)
-    if (g.label) o += text(g.label, g.x + 12, g.y + 13, FS - 2, 600, th.sub, 'start')
+    if (g.label) o += text(g.label, g.x + 12, g.y + 13, base - 2, 600, th.sub, 'start')
     if (g.attrs.repeat) {
       // put "N×" on the outer side of the diagram
       const right = g.x + g.w / 2 > cx
-      o += text(g.attrs.repeat, right ? g.x + g.w + 10 : g.x - 10, g.y + g.h / 2, FS + 2, 500, th.text, right ? 'start' : 'end')
+      o += text(g.attrs.repeat, right ? g.x + g.w + 10 : g.x - 10, g.y + g.h / 2, base + 2, 500, th.text, right ? 'start' : 'end')
     }
     o += badge(mark(g, fx), g.x + g.w - 2, g.y + 2)
     return o
@@ -496,7 +496,7 @@ export function render(d: Diagram, theme?: string, materials = true): string {
   const edges = d.edges.map(drawEdge).join('')
   const nodes = [...d.nodes.values()].map(drawNode).join('')
   const labels = d.edges.filter(e => e.label && e.lx !== undefined)
-    .map(e => text(e.label!, e.lx!, e.ly!, FS - 1, 400, th.sub)).join('')
+    .map(e => text(e.label!, e.lx!, e.ly!, base - 1, 400, th.sub)).join('')
   if (x0 === Infinity) x0 = y0 = x1 = y1 = 0
   const m = 14, W = x1 - x0 + m * 2, H = y1 - y0 + m * 2
   const bg = th.bg !== 'none' ? s`<rect x="${x0 - m}" y="${y0 - m}" width="${W}" height="${H}" rx="10" fill="${th.bg}"/>` : ''

@@ -9,6 +9,9 @@ import { layoutLabel } from './tex'
 export const FS = 13
 export const OUTSIDE = new Set(['tensor', 'stack', 'image', 'neurons', 'gaussian', 'space', 'sphere'])
 export const values = (n: Node): string[] => JSON.parse(n.attrs.values ?? '[]')
+/** label size of a block: its own fontSize, else derived from the figure's base size */
+export const labelSize = (n: Node, base: number) =>
+  +n.attrs.fontSize || (n.shape === 'thin' || n.shape === 'vector' || OUTSIDE.has(n.shape) ? base - 1 : base)
 export const nums = (s: string | undefined, def: number[]) => (s ? s.split(',').map(Number) : def)
 const REL: Record<string, [number, number]> = { 'left-of': [-1, 0], 'right-of': [1, 0], above: [0, -1], below: [0, 1] }
 const GP = 14 // group padding
@@ -16,8 +19,8 @@ const GP = 14 // group padding
 type V = [number, number]
 type R = { u: number; v: number; hu: number; hv: number }
 
-function size(n: Node, horiz: boolean) {
-  const lb = layoutLabel(n.label, n.shape === 'thin' ? FS - 1 : FS, 500)
+function size(n: Node, horiz: boolean, base: number) {
+  const fs = labelSize(n, base), lb = layoutLabel(n.label, fs, 500)
   let w: number, h: number
   switch (n.shape) {
     case 'thin': w = Math.max(lb.w + 26, 64); h = lb.h + 9; break
@@ -31,8 +34,9 @@ function size(n: Node, horiz: boolean) {
     case 'neurons': { const c = (+n.attrs.n || 4) * 20 + 4; [w, h] = horiz ? [22, c] : [c, 22]; break }
     case 'vector': {
       const vals = values(n)
-      const cw = Math.max(36, ...vals.map(v => layoutLabel(v.trim(), FS - 1).w + 14))
-      ;[w, h] = horiz ? [cw, vals.length * 20 + 4] : [vals.length * cw + 4, 22]
+      const cw = Math.max(36, ...vals.map(v => layoutLabel(v.trim(), fs).w + 14))
+      const ch = Math.max(20, fs + 8)
+      ;[w, h] = horiz ? [cw, vals.length * ch + 4] : [vals.length * cw + 4, ch + 2]
       break
     }
     case 'image': { const [W, H] = nums(n.attrs.size, [64, 64]), k = +n.attrs.n || 1; w = W + (k - 1) * 6; h = H + (k - 1) * 6; break }
@@ -50,7 +54,8 @@ export function layout(d: Diagram) {
   const horiz = d.dir === 'LR' || d.dir === 'RL'
   const [gapM, gapC] = d.gap ?? (horiz ? [56, 36] : [30, 44])
   const nodes = [...d.nodes.values()]
-  for (const n of nodes) size(n, horiz)
+  const base = d.fontSize ?? FS
+  for (const n of nodes) size(n, horiz, base)
   const M = (n: Node) => (horiz ? n.w : n.h), C = (n: Node) => (horiz ? n.h : n.w)
   const toS = (u: number, v: number): V => (d.dir === 'TB' ? [v, u] : d.dir === 'BT' ? [v, -u] : d.dir === 'LR' ? [u, v] : [-u, v])
   const toA = (x: number, y: number): V => (d.dir === 'TB' ? [y, x] : d.dir === 'BT' ? [-y, x] : d.dir === 'LR' ? [x, y] : [-x, y])
@@ -136,7 +141,7 @@ export function layout(d: Diagram) {
   for (const e of d.edges) {
     const a = d.nodes.get(e.from)!, b = d.nodes.get(e.to)!
     if (!e.label || !inGrid.has(a.id) || !inGrid.has(b.id) || rk(b) <= rk(a)) continue
-    const lb = layoutLabel(e.label, FS - 1)
+    const lb = layoutLabel(e.label, base - 1)
     need[rk(b)] = Math.max(need[rk(b)], horiz ? lb.w + 24 : lb.h + 16)
   }
   const lp = [lw[0] / 2], rp = [rs[0] / 2]
@@ -293,7 +298,7 @@ export function layout(d: Diagram) {
   // --- edge labels: beside the longest segment, outside of U turns
   for (const e of d.edges) {
     if (!e.label || e.pts.length < 2) continue
-    const lb = layoutLabel(e.label, FS - 1)
+    const lb = layoutLabel(e.label, base - 1)
     let best = 0, bi = 0
     for (let i = 0; i + 1 < e.pts.length; i++) {
       const L = Math.hypot(e.pts[i + 1][0] - e.pts[i][0], e.pts[i + 1][1] - e.pts[i][1])

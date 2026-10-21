@@ -22,6 +22,8 @@ export interface Group {
 }
 export interface Diagram {
   dir: Dir; theme: string; gap?: [number, number]
+  /** base text size (px); blocks may set attrs.fontSize */
+  fontSize?: number
   nodes: Map<string, Node>; edges: Edge[]; groups: Group[]; ranks: string[][]
 }
 

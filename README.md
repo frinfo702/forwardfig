@@ -87,6 +87,37 @@ Edges (`x.edge({...})` / `fig.edge(a, b, {...})`): `label` `crossed` `dashed` `a
 
 Labels: a newline (`\n`) starts a new line, and `$...$` is TeX. Supported: `^ _ \mathbf \mathrm \text \boldsymbol \mathcal \mathbb`, Greek letters, common symbols, `\hat \tilde \bar \vec`, and `\frac` (rendered as a/b).
 
+## Custom presets
+
+The built-in presets (`mha`, `norm` and so on) are just a shape plus a default label and colour. You can define your own the same way.
+
+```ts
+const rmsnorm = preset('thin', 'RMSNorm', 'yellow')
+const moe = preset('block', 'MoE', { color: 'orange', ghost: 3, kind: 'moe' })
+rmsnorm()(x)                       // default label and colour
+rmsnorm('Pre-Norm', { color: 'blue' })(x)  // override them
+```
+
+`kind` is the key that `kinds` (below) matches on. It defaults to the shape name.
+
+## Style config
+
+Like matplotlib's rcParams, you can set defaults globally and narrow them down by scope. A narrower scope always wins, so a value applies unless a lower level sets its own.
+
+```ts
+configure({ style: { fontSize: 14 }, kinds: { mha: { color: 'purple' } } })  // whole library
+new Figure({ style: { color: 'gray' } })                                    // this figure
+new Encoder({ style: { fontSize: 11, texture: 'glass' } })                  // blocks made inside this module
+block('x', { fontSize: 20 })                                                // the block itself wins
+configure(null)                                                             // reset
+```
+
+- Precedence, strongest first: the block's own options > inner Module > outer Module > Figure > `configure()` > the preset's defaults.
+- At each level, `kinds[kind]` (for one preset) beats `style` (for all blocks).
+- `style` can set `color` `texture` `fontSize` `dashed` `bold`. At the Figure / `configure` level, `fontSize` also sizes edge labels, group titles and captions.
+- A `texture` set through style doesn't override `freeze()` / `train()` (ice and magma win). A texture set on the block itself does.
+- `configure` also takes `theme` `flow` `gap` `materials`.
+
 ## Drawing core
 
 The layout and rendering engine is independent of the API above. `fig.diagram()` returns plain `Diagram` data (nodes, edges, groups, ranks), which `draw(diagram, { theme })` turns into SVG. Anything that can generate a Diagram, from another language or as JSON, can reuse the same engine.

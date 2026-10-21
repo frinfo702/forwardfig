@@ -169,65 +169,84 @@ const graphOf = (xs: Tensor[], who: string) => {
 
 // --- layers
 
+export type Shape = 'block' | 'thin' | 'text' | 'circle' | 'op' | 'enc' | 'dec' | 'tensor' | 'stack' | 'neurons'
+  | 'vector' | 'image' | 'gaussian' | 'space' | 'sphere'
+
 export interface Layer<O extends NodeOptions = NodeOptions> {
   (...inputs: Tensor[]): Tensor
   readonly shape: string
+  /** preset name, used to look up `kinds` in a style config (e.g. 'mha', 'norm', 'block') */
+  readonly kind: string
   label: string
+  /** what the caller passed; always wins */
   options: O
+  /** what the preset supplies; loses to any style config */
+  readonly defaults: NodeOptions
   /** mark as frozen (🧊) */
   freeze(): this
   /** mark as trainable (🔥) */
   train(): this
 }
 
-export function layer<O extends NodeOptions>(shape: string, label: string, options: O): Layer<O> {
+export function layer<O extends NodeOptions>(shape: string, label: string, options: O, kind = shape, defaults: NodeOptions = {}): Layer<O> {
   const L = ((...xs: Tensor[]) => graphOf(xs, `"${L.label}"`).apply(L, xs)) as Layer<O>
   return Object.assign(L, {
-    shape, label, options,
+    shape, kind, label, options, defaults,
     freeze() { L.options.frozen = true; L.options.train = false; return L },
     train() { L.options.train = true; L.options.frozen = false; return L },
   })
 }
 
-type Factory<O extends NodeOptions> = { (label?: string, options?: O): Layer<O>; (options?: O): Layer<O> }
-const factory = <O extends NodeOptions = NodeOptions>(shape: string, def = '', color?: string): Factory<O> =>
-  (a?: string | O, b?: O) => {
-    const [label, o] = typeof a === 'string' ? [a, b ?? ({} as O)] : [def, a ?? ({} as O)]
-    return layer(shape, label, color && !o.color ? { ...o, color } : { ...o })
-  }
+export type Factory<O extends NodeOptions = NodeOptions> = { (label?: string, options?: O): Layer<O>; (options?: O): Layer<O> }
+
+/**
+ * Define a block type, the way the built-in presets are defined:
+ *   const rmsnorm = preset('thin', 'RMSNorm', 'yellow')
+ *   const moe = preset('block', 'MoE', { color: 'orange', ghost: 3, kind: 'moe' })
+ * The third argument is a color or default options. `kind` (default: the shape)
+ * is the key a style config's `kinds` uses.
+ */
+export function preset<O extends NodeOptions = NodeOptions>(shape: Shape, label = '', defaults: string | (NodeOptions & { kind?: string }) = {}): Factory<O> {
+  const { kind = shape, ...base } = typeof defaults === 'string' ? { color: defaults } : defaults
+  const s = shape === 'circle' ? 'var' : shape
+  return ((a?: string | O, b?: O) => {
+    const [l, o] = typeof a === 'string' ? [a, b ?? ({} as O)] : [label, a ?? ({} as O)]
+    return layer(s, l, { ...o }, kind, base)
+  }) as Factory<O>
+}
 
 // basic shapes
-export const block = factory('block')
-export const thin = factory('thin')
-export const text = factory('text')
-export const circle = factory('var')
-export const op = factory('op', '+')
-export const enc = factory('enc', 'Encoder', 'blue')
-export const dec = factory('dec', 'Decoder', 'green')
-export const tensor = factory<TensorOptions>('tensor', '', 'blue')
-export const stack = factory<StackOptions>('stack', '', 'blue')
-export const neurons = factory<NeuronOptions>('neurons')
+export const block = preset('block')
+export const thin = preset('thin')
+export const text = preset('text')
+export const circle = preset('circle')
+export const op = preset('op', '+')
+export const enc = preset('enc', 'Encoder', 'blue')
+export const dec = preset('dec', 'Decoder', 'green')
+export const tensor = preset<TensorOptions>('tensor', '', 'blue')
+export const stack = preset<StackOptions>('stack', '', 'blue')
+export const neurons = preset<NeuronOptions>('neurons')
 export const vector = (values: string[], options: NodeOptions = {}) => layer('vector', '', { ...options, values })
 // ML presets
-export const mha = factory('block', 'Multi-Head Attention', 'orange')
-export const attention = factory('block', 'Attention', 'orange')
-export const ffn = factory('block', 'Feed Forward', 'blue')
-export const mlp = factory('block', 'MLP', 'blue')
-export const norm = factory('thin', 'Add & Norm', 'yellow')
-export const embed = factory('block', 'Embedding', 'pink')
-export const linear = factory('thin', 'Linear', 'purple')
-export const softmax = factory('thin', 'Softmax', 'green')
-export const matmul = factory('thin', 'MatMul', 'purple')
-export const concat = factory('thin', 'Concat', 'yellow')
-export const conv = factory('block', 'Conv', 'teal')
-export const pool = factory('thin', 'Pool', 'gray')
-export const act = factory('thin', 'ReLU', 'green')
-export const dropout = factory('thin', 'Dropout', 'gray')
-export const loss = factory('block', 'Loss', 'red')
+export const mha = preset('block', 'Multi-Head Attention', { color: 'orange', kind: 'mha' })
+export const attention = preset('block', 'Attention', { color: 'orange', kind: 'attention' })
+export const ffn = preset('block', 'Feed Forward', { color: 'blue', kind: 'ffn' })
+export const mlp = preset('block', 'MLP', { color: 'blue', kind: 'mlp' })
+export const norm = preset('thin', 'Add & Norm', { color: 'yellow', kind: 'norm' })
+export const embed = preset('block', 'Embedding', { color: 'pink', kind: 'embed' })
+export const linear = preset('thin', 'Linear', { color: 'purple', kind: 'linear' })
+export const softmax = preset('thin', 'Softmax', { color: 'green', kind: 'softmax' })
+export const matmul = preset('thin', 'MatMul', { color: 'purple', kind: 'matmul' })
+export const concat = preset('thin', 'Concat', { color: 'yellow', kind: 'concat' })
+export const conv = preset('block', 'Conv', { color: 'teal', kind: 'conv' })
+export const pool = preset('thin', 'Pool', { color: 'gray', kind: 'pool' })
+export const act = preset('thin', 'ReLU', { color: 'green', kind: 'act' })
+export const dropout = preset('thin', 'Dropout', { color: 'gray', kind: 'dropout' })
+export const loss = preset('block', 'Loss', { color: 'red', kind: 'loss' })
 // 3D
-export const gaussian = factory<GaussianOptions>('gaussian', '', 'purple')
-export const space = factory<SpaceOptions>('space', '', 'gray')
-export const sphere = factory<SphereOptions>('sphere', '', 'blue')
+export const gaussian = preset<GaussianOptions>('gaussian', '', 'purple')
+export const space = preset<SpaceOptions>('space', '', 'gray')
+export const sphere = preset<SphereOptions>('sphere', '', 'blue')
 
 export type ImageSource = string | { currentSrc?: string; src?: string } | { toDataURL(type?: string): string }
 /** A real image: URL, data URL, <img> or <canvas>. */
@@ -241,9 +260,26 @@ export function image(src: ImageSource, a?: string | ImageOptions, b?: ImageOpti
 export const add = (...xs: Tensor[]) => op('+')(...xs)
 export const mul = (...xs: Tensor[]) => op('*')(...xs)
 
+// --- style config
+
+/** What a style config can set on blocks. */
+export interface Style {
+  color?: string
+  texture?: Texture
+  /** label size (px); at figure / configure level it also sizes edge, group and caption text */
+  fontSize?: number
+  dashed?: boolean
+  bold?: boolean
+}
+/** `style` applies to every block in scope, `kinds` to one preset (wins over `style` at the same level). */
+export interface StyleConfig {
+  style?: Style
+  kinds?: Record<string, Style>
+}
+
 // --- modules
 
-export interface ModuleOptions {
+export interface ModuleOptions extends StyleConfig {
   id?: string
   /** group title */
   label?: string
@@ -288,13 +324,35 @@ export abstract class Module<O = Tensor> {
 
 // --- figure
 
-export interface FigureOptions {
+export interface FigureOptions extends StyleConfig {
   flow?: Dir
   theme?: 'light' | 'dark'
   /** [along the flow, across it] in px */
   gap?: V2
   /** bake WebGL ice / magma when available (default true) */
   materials?: boolean
+}
+
+let defaults: FigureOptions = {}
+/**
+ * Library-wide defaults, like matplotlib's rcParams. Figures, modules and blocks
+ * override them; `configure(null)` resets. Returns the current config.
+ *   configure({ style: { fontSize: 14, color: 'gray' }, kinds: { mha: { color: 'purple' } } })
+ */
+export function configure(config: FigureOptions | null): FigureOptions {
+  defaults = config === null ? {} : merge(defaults, config)
+  return defaults
+}
+const merge = (a: FigureOptions, b: FigureOptions): FigureOptions => {
+  const kinds = { ...a.kinds }
+  for (const [k, v] of Object.entries(b.kinds ?? {})) kinds[k] = { ...kinds[k], ...v }
+  return { ...a, ...b, style: { ...a.style, ...b.style }, kinds }
+}
+// later entries win; undefined never overrides
+const cascade = (...layers: (object | undefined)[]) => {
+  const out: Record<string, unknown> = {}
+  for (const l of layers) for (const [k, v] of Object.entries(l ?? {})) if (v !== undefined) out[k] = v
+  return out
 }
 
 const SKIP = new Set(['id', 'color', 'frozen', 'train', 'dashed', 'bold', 'crossed'])
@@ -322,12 +380,24 @@ export class Figure {
 
   /** Compile to the drawing core's plain data. */
   diagram(): Diagram {
-    const g = this.g, nodes = new Map<string, Node>()
+    const g = this.g, nodes = new Map<string, Node>(), cfg = merge(defaults, this.options)
     let order = 0
     for (const [L, r] of g.nodes) {
-      const o = L.options as Record<string, unknown> & NodeOptions
+      // preset defaults < configure() < figure < outer module < inner module < the block's own options
+      const scopes: (StyleConfig | undefined)[] = [cfg, ...r.mods.map(m => m.options)]
+      const own = L.options as Record<string, unknown> & NodeOptions
+      const o = cascade(L.defaults, ...scopes.flatMap(c => [c?.style, c?.kinds?.[L.kind]]), own) as Record<string, unknown> & NodeOptions
+      let label = L.label
+      const strip = (e: string) => {
+        if (!label.includes(e)) return false
+        label = label.replace(e, '').trim()
+        return true
+      }
+      const iced = strip('🧊'), fired = strip('🔥')
       const inherited = [...r.mods].reverse().map(m => m.options).find(m => m.frozen || m.train)
-      const fx = o.frozen ? 'frozen' : o.train ? 'train' : inherited?.frozen ? 'frozen' : inherited?.train ? 'train' : ''
+      const fx = own.frozen || iced ? 'frozen' : own.train || fired ? 'train' : inherited?.frozen ? 'frozen' : inherited?.train ? 'train' : ''
+      // a styled texture must not hide what freeze() / train() say; only the block's own texture may
+      if (fx && !own.texture) delete o.texture
       const flags = new Set([fx, o.dashed && 'dashed', o.bold && 'bold', o.crossed && 'crossed'].filter((f): f is string => !!f))
       const attrs: Record<string, string> = {}
       for (const [k, v] of Object.entries(o)) {
@@ -336,9 +406,6 @@ export class Figure {
           : Array.isArray(v) && v.every(x => typeof x === 'number') ? v.join(',')
             : typeof v === 'object' ? JSON.stringify(v) : String(v)
       }
-      let label = L.label
-      if (label.includes('🧊')) { flags.add('frozen'); label = label.replace('🧊', '').trim() }
-      if (label.includes('🔥')) { flags.add('train'); label = label.replace('🔥', '').trim() }
       nodes.set(r.id, { id: r.id, shape: L.shape, label, color: o.color, flags, attrs, groups: r.groups, order: order++, x: 0, y: 0, w: 0, h: 0 })
     }
     const edges: Edge[] = g.edges.map(({ from, to, style: s }) => ({
@@ -348,13 +415,14 @@ export class Figure {
       attrs: { ...(s.side && { side: s.side }), ...(s.color && { color: s.color }) },
     }))
     return {
-      dir: this.options.flow ?? 'TB', theme: this.options.theme ?? 'light', gap: this.options.gap,
+      dir: cfg.flow ?? 'TB', theme: cfg.theme ?? 'light', gap: cfg.gap, fontSize: cfg.style?.fontSize,
       nodes, edges, groups: [...g.groups.values()].map(x => ({ ...x, flags: new Set(x.flags) })), ranks: g.ranks.map(rs => rs.map(r => g.id(r))),
     }
   }
   /** Render to an SVG string (works without a DOM). */
   svg(options: { theme?: 'light' | 'dark' } = {}): string {
-    return render(layout(this.diagram()), options.theme ?? this.options.theme, this.options.materials ?? true)
+    const d = this.diagram()
+    return render(layout(d), options.theme ?? d.theme, merge(defaults, this.options).materials ?? true)
   }
   /** Render into an element (or a CSS selector). */
   mount(target: string | Element, options: { theme?: 'light' | 'dark' } = {}): this {
