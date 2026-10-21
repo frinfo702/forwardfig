@@ -1,6 +1,6 @@
 {
   "name": "forwardfig",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Draw ML architecture figures in TypeScript, written the way you write the model. Zero dependencies, SVG out.",
   "type": "module",
   "main": "dist/forwardfig.js",
