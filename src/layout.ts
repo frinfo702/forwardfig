@@ -102,14 +102,31 @@ export function layout(d: Diagram) {
     if (!out.has(a)) out.set(a, [])
     out.get(a)!.push({ to: b, e })
   }
-  const back = new Set<Edge>(), state = new Map<string, number>(), post: string[] = []
+  // back edges: take edges in the order they were drawn and drop each one that would close a
+  // cycle, so the flow written first wins and a column folded back with `rank` is what runs back
+  // ponytail: a reachability search per edge, O(E·(V+E)); fine at figure sizes
+  const back = new Set<Edge>(), dag = new Map<string, string[]>()
+  const reaches = (from: string, to: string) => {
+    const seen = new Set([from]), todo = [from]
+    while (todo.length) {
+      const a = todo.pop()!
+      if (a === to) return true
+      for (const b of dag.get(a) ?? []) if (!seen.has(b)) { seen.add(b); todo.push(b) }
+    }
+    return false
+  }
+  for (const e of d.edges) {
+    if (!inGrid.has(e.from) || !inGrid.has(e.to)) continue
+    const a = find(e.from), b = find(e.to)
+    if (a === b) continue
+    if (reaches(b, a)) { back.add(e); continue }
+    if (!dag.has(a)) dag.set(a, [])
+    dag.get(a)!.push(b)
+  }
+  const state = new Map<string, number>(), post: string[] = []
   const dfs = (a: string) => {
     state.set(a, 1)
-    for (const { to, e } of out.get(a) ?? []) {
-      const s = state.get(to)
-      if (s === 1) back.add(e)
-      else if (!s) dfs(to)
-    }
+    for (const { to, e } of out.get(a) ?? []) if (!back.has(e) && !state.get(to)) dfs(to)
     state.set(a, 2)
     post.push(a)
   }
@@ -157,6 +174,9 @@ export function layout(d: Diagram) {
     occ.add(r + ':' + l)
     lane.set(n.id, l)
   }
+  // a negative `lane` adds columns before lane 0: shift everything so lanes start at 0
+  const shift = -Math.floor(Math.min(0, ...lane.values()))
+  if (shift) { for (const [id, l] of lane) lane.set(id, l + shift); next += shift }
 
   // --- crossings: swap neighbouring lanes (whole columns, so chains stay straight) while that
   // strictly lowers the count. Lanes with an explicit `lane` or a block between lanes stay put,
@@ -385,7 +405,8 @@ export function layout(d: Diagram) {
       const a = d.nodes.get(e.from)!, b = d.nodes.get(e.to)!
       if (b.groups.some(x => !a.groups.includes(x))) {
         const first = Math.min(...[...rc.values()].filter(r => r.u - r.hu > s0 + 1 && r.u < T.u && r.v + r.hv > lo && r.v - r.hv < hi).map(r => r.u - r.hu))
-        if (first - GP + 6 - s0 > 6) g = first - GP + 6 - s0
+        // no block before T in the corridor: Math.min() of nothing is Infinity, keep the default gap
+        if (Number.isFinite(first) && first - GP + 6 - s0 > 6) g = first - GP + 6 - s0
       }
       const v = channel(side, s0 + g, T.u + T.hu, lo, hi)
       fin(e, [[s0, S.v], [s0 + g, S.v], [s0 + g, v], [T.u, v], [T.u, T.v + side * T.hv]])

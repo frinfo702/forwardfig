@@ -58,9 +58,19 @@ your image-reading tool and check:
   enter, not floating in their own column?
 - Is every label readable, not overlapping an arrow or another label?
 - Does each group box contain exactly what it should, and is `N×` placed well?
+- **Is there a large empty region** (a blank quadrant, a box much bigger than
+  what's in it)? It usually means one column was pushed far out by a long
+  edge; move that column or the block that pulled it (§3).
+- **What is the aspect ratio?** A paper figure has to fit a column or a slide.
+  Wider than about 2.5 : 1 or taller than about 1 : 2 means it will be shrunk
+  until the text is unreadable. Compact it (§3) even if nothing crosses.
 
 Fix the single worst problem, re-render, look again. Changing several hints at
 once makes it hard to tell which one helped.
+
+A Mermaid / graphviz sketch is a list of nodes and edges, not a layout. Don't
+translate it node for node and stop: the straight translation is usually a long
+strip. Translate it, render it, then compact it.
 
 ## 1. Structure the code like the model
 
@@ -117,7 +127,50 @@ Why this order: the grid keeps chains straight and edges orthogonal for free.
 Every hint that removes a block from the grid (`leftOf`, `at`) gives that up
 for that block, so use them for leaf decorations, not the main path.
 
-## 3. Make it read like a paper figure
+## 3. Compact it
+
+The automatic layout puts every block one rank further along the flow, so a
+long model becomes a long strip. Paper figures avoid that by using both axes.
+Try these in order and re-render after each; `references/recipes.md` has both
+worked examples ("PixDiT, compact" and "MM-DiT, folded").
+
+1. **Turn operations into edge labels.** An op that sits between two things
+   and has no weights of its own in the story (AdaLN-Zero, Text Encoding,
+   patchify, a projection) can be `x.edge('AdaLN-Zero')` instead of a block.
+   Every block removed is one rank shorter.
+2. **Stack a module across the flow.** When a module's parts are peers rather
+   than a pipeline (text token / condition / image token, a condition that
+   modulates two things), put them on one rank with `fig.rank(a, b, c)` and
+   stack them with `lane`. Edges between blocks on the same rank are drawn as
+   short straight lines across the flow, so an LR figure gets a TB column
+   inside the box, and the box stays narrow.
+3. **Fold a long chain back.** For a two-half block (attention half, FFN
+   half), let the first half run down the middle, turn at the ⊕, and run the
+   second half back up an outer lane. Pin each block on the way back to the
+   block on the way down at the same height:
+   `fig.rank(n2, g1).rank(s2, attn).rank(f, qkv)…`, and rank the output with
+   the input so it leaves at the top. Leave the turning ⊕ unranked so it sits
+   one row past the last block. Write the downward flow before the way back:
+   when edges close a loop, the one drawn last is the one that runs back.
+4. **Put a shared source where its edges flow with the figure.** A condition
+   MLP that feeds every block belongs at the top of a TB figure (rank it with
+   the inputs), so all its edges run down. Don't park it with `below` / `at`:
+   blocks outside the grid get edges that are not routed around other blocks.
+5. **Route a fan of conditioning edges through the gutters**, but only after a
+   direct `join: 'side'` tap has been rendered and actually crosses a block or
+   enters from the top. Taps cost several renders to get right; if the direct
+   taps already come in from the side, stop. When a
+   modulation edge would have to cross a block to reach its target, give it a
+   waypoint: `empty({ lane: 0.5 })(c.edge({ arrow: 'none' }))` in the gap
+   between columns, ranked with the target, then `tap.edge(...)` into the
+   target from the side. Chain taps down a gutter
+   (`empty({ lane: 0.5 })(tap1.edge({ arrow: 'none' }))`) for several targets.
+   `x.edge({ join: 'side', side: 'left' })` picks which side a direct tap
+   enters from.
+6. **Use negative lanes to add a row or column before lane 0** (forwardfig
+   after 0.1.2) instead of renumbering every lane.
+
+## 4. Make it read like a paper figure
 
 - **Color by role, not by block.** Use the presets (`mha` orange, `ffn` blue,
   `norm` yellow, …) so the same kind of block looks the same everywhere. Two
@@ -144,7 +197,7 @@ for that block, so use them for leaf decorations, not the main path.
   drawing three blocks.
 - **Match the paper's font** with `new Figure({ style: { fontFamily: 'Times New Roman, serif' } })`.
 
-## 4. Define your own building blocks
+## 5. Define your own building blocks
 
 When a paper uses a block type repeatedly, make a preset once so labels and
 colors stay consistent:
@@ -161,6 +214,14 @@ a tensor. See `references/recipes.md` for examples.
 ## Common mistakes
 
 - Expecting two blocks from one reused layer instance (see §1).
+- Calling a block with no inputs: `block('M')()` throws "was called without
+  inputs". Anything with no incoming edge (a state `M_t`, a learned constant,
+  a second input) starts with `fig.input(block('M', {...}))`. To keep it inside
+  a module's box, make it a field (`m = block('M')`) and call
+  `fig.input(this.m)` inside `forward`.
+- Passing an array to a layer or a module: `layer(xs)` / `mod([a, b])` throws
+  "inputs must be Tensors". Spread it: `layer(...xs)`, `mod(a, b)`. `forward()`
+  may *return* an array or object.
 - Forgetting `export default fig` (or exporting a function that returns it) —
   the CLI exits with "exports no Figure".
 - Single backslashes in TeX inside TS strings: `'$\mathbf{x}$'` silently loses

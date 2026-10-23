@@ -17,7 +17,7 @@ Placement is automatic. Blocks sit on a grid of ranks (the longest path from an 
 
 | Option | What it does |
 | --- | --- |
-| `lane` | The cross-axis column. Fractions sit between columns. |
+| `lane` | The cross-axis column. Fractions sit between columns; negative lanes come before lane 0. |
 | `align: ref` | Same column as another block. |
 | `leftOf` / `rightOf` / `above` / `below: ref` | Next to another block, `dist` px apart (default 22). Taken out of the grid. |
 | `at: [x, y]` | An absolute position in px. |
