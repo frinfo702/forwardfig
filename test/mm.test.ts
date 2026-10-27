@@ -622,3 +622,15 @@ test('plot(): scatter points with markers, ranges from the points, and a legend'
   cut.input(plot({ x: [0, 1], points: [{ at: [[0.5, 0], [5, 0]] }] }))
   expect(cut.svg().match(/<circle /g)!.length).toBe(1)
 })
+
+test('icon: a picture left of the label widens the block', () => {
+  const fig = new Figure()
+  const logo = 'data:image/svg+xml,%3Csvg/%3E'
+  block('Gemini', { icon: logo })(block('Gemini')(fig.input('x')))
+  const d = fig.diagram()
+  layout(d)
+  const [plain, withIcon] = [...d.nodes.values()].slice(1)
+  expect(withIcon.attrs.icon).toBe(logo)
+  expect(withIcon.w).toBeGreaterThan(plain.w)
+  expect(fig.svg()).toContain(`<image href="${logo}"`)
+})

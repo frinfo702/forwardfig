@@ -78,6 +78,7 @@ Custom presets: `const rmsnorm = preset('thin', 'RMSNorm', 'yellow')`,
 | `w`, `h` | Fixed size in px |
 | `ghost` | Stacked copies behind the block (heads, experts) |
 | `caption` | Small text under the block |
+| `icon` | Picture (URL / data URL / `<img>` / `<canvas>`) left of the label, e.g. a model's company logo. Block and thin shapes |
 | `fontSize`, `fontFamily` | Label font |
 | `id` | Stable unique id |
 

@@ -1,5 +1,5 @@
 import type { Diagram, Edge, Group, Node } from './types'
-import { FS, OUTSIDE, hits, imageMatrix, labelSize, nums, values, type Box } from './layout'
+import { FS, ICON_GAP, OUTSIDE, hits, iconSize, imageMatrix, labelSize, nums, values, type Box } from './layout'
 import { bake, type Material } from './materials'
 import { REGULAR, SANS, SERIF, layoutLabel } from './tex'
 
@@ -295,11 +295,19 @@ export function render(d: Diagram, theme?: string, materials = true): string {
     // busy textures get a halo in the page color
     const size = labelSize(n, base), ff = n.attrs.fontFamily || family
     const [ink, halo] = fx === 'metal' ? ['#1d2430', '#e8ebee'] : [th.text, th.halo] // metal is light in both themes
-    const label = () => baked && fx === 'magma'
-      ? `<g paint-order="stroke" stroke="#1a0d07" stroke-width="3" stroke-linejoin="round">${text(n.label, n.x, n.y, size, 600, '#fff4e8', 'middle', ff)}</g>`
+    const label = (x = n.x) => baked && fx === 'magma'
+      ? `<g paint-order="stroke" stroke="#1a0d07" stroke-width="3" stroke-linejoin="round">${text(n.label, x, n.y, size, 600, '#fff4e8', 'middle', ff)}</g>`
       : baked && fx !== 'ice' && fx !== 'glass'
-        ? `<g paint-order="stroke" stroke="${halo}" stroke-width="3" stroke-linejoin="round" stroke-opacity=".85">${text(n.label, n.x, n.y, size, 600, ink, 'middle', ff)}</g>`
-        : text(n.label, n.x, n.y, size, 500, th.text, 'middle', ff)
+        ? `<g paint-order="stroke" stroke="${halo}" stroke-width="3" stroke-linejoin="round" stroke-opacity=".85">${text(n.label, x, n.y, size, 600, ink, 'middle', ff)}</g>`
+        : text(n.label, x, n.y, size, 500, th.text, 'middle', ff)
+    // icon + label, centered together
+    const iconLabel = () => {
+      if (!n.attrs.icon) return label()
+      // same weight label() draws with; shrink the icon to fit a block given a small h
+      const ic = Math.min(iconSize(size), n.h - 6), lw = n.label ? layoutLabel(n.label, size, baked && fx !== 'ice' && fx !== 'glass' ? 600 : 500, ff).w : 0
+      const x0 = n.x - (ic + (lw && ICON_GAP + lw)) / 2
+      return s`<image href="${esc(n.attrs.icon)}" x="${x0}" y="${n.y - ic / 2}" width="${ic}" height="${ic}" preserveAspectRatio="xMidYMid meet"/>` + (lw ? label(x0 + ic + ICON_GAP + lw / 2) : '')
+    }
     switch (n.shape) {
       case 'text': o = label(); break
       case 'empty': break
@@ -610,7 +618,7 @@ export function render(d: Diagram, theme?: string, materials = true): string {
       }
       default: {
         const r = n.shape === 'thin' ? 5 : 7
-        o = body(rr(L, T, n.w, n.h, r), undefined, r) + label()
+        o = body(rr(L, T, n.w, n.h, r), undefined, r) + iconLabel()
       }
     }
     if (OUTSIDE.has(n.shape) && n.label) o += text(n.label, n.x, T - (ghosts * 5) - 11, size, 500, th.sub, 'middle', ff)

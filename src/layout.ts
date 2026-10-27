@@ -32,11 +32,15 @@ type R = { u: number; v: number; hu: number; hv: number }
 export type Box = [number, number, number, number]
 export const hits = (a: Box, b: Box) => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1]
 
+export const ICON_GAP = 6
+export const iconSize = (fs: number) => Math.round(fs * 1.6)
+
 function size(n: Node, horiz: boolean, base: number, family: string) {
   const fs = labelSize(n, base), ff = n.attrs.fontFamily || family, lb = layoutLabel(n.label, fs, 500, ff)
   let w: number, h: number
+  const ic = n.attrs.icon ? iconSize(fs) : 0, iw = ic && ic + (n.label ? ICON_GAP : 0)
   switch (n.shape) {
-    case 'thin': w = Math.max(lb.w + 26, 64); h = lb.h + 9; break
+    case 'thin': w = Math.max(lb.w + iw + 26, 64); h = Math.max(lb.h, ic) + 9; break
     case 'op': w = h = 22; break
     case 'circle': w = h = Math.max(42, lb.w + 18, lb.h + 16); break
     case 'tensor': { const [W, H, D] = nums(n.attrs.size, [36, 64, 20]); w = W + D * 0.6; h = H + D * 0.6; break }
@@ -71,7 +75,7 @@ function size(n: Node, horiz: boolean, base: number, family: string) {
     case 'plot': [w, h] = nums(n.attrs.size, [120, 84]); break
     case 'text': w = lb.w + 8; h = lb.h + 4; break
     case 'empty': w = h = 0; break
-    default: w = Math.max(lb.w + 30, 76); h = lb.h + 18
+    default: w = Math.max(lb.w + iw + 30, 76); h = Math.max(lb.h, ic) + 18
   }
   n.w = +n.attrs.w || w
   n.h = +n.attrs.h || h
