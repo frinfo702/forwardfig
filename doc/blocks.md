@@ -75,6 +75,7 @@ Presets are a shape with a default label and color. Call them with no arguments 
 | `w` / `h` | `number` | Fixed size in px. |
 | `ghost` | `number` | Stacked copies behind the block, e.g. attention heads. |
 | `caption` | `string` | Small text under the block. |
+| `icon` | `string` \| `<img>` \| `<canvas>` | A picture left of the label, e.g. a company logo: `block('Qwen3', { icon: 'https://…/qwen.svg' })`. Block and thin shapes. CLI raster export loads only http(s) and data URLs. |
 | `fontSize` | `number` | Label size in px. |
 | `fontFamily` | `string` | Label font (CSS font family). |
 

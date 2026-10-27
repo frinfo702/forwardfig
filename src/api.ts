@@ -41,6 +41,8 @@ export interface NodeOptions {
   ghost?: number
   /** small text under the block */
   caption?: string
+  /** a picture left of the label (block, thin and their presets), e.g. a company logo: block('Gemini', { icon: 'google.svg' }) */
+  icon?: ImageSource
   // placement: everything is automatic unless one of these is set
   /** cross-axis column; fractions sit between columns */
   lane?: number
@@ -607,7 +609,8 @@ export class Figure {
       const attrs: Record<string, string> = {}
       for (const [k, v] of Object.entries(o)) {
         if (SKIP.has(k) || v === undefined) continue
-        attrs[KEY[k] ?? k] = v instanceof Tensor || typeof v === 'function' ? g.id(v as Ref)
+        attrs[KEY[k] ?? k] = k === 'icon' ? href(v as ImageSource)
+          : v instanceof Tensor || typeof v === 'function' ? g.id(v as Ref)
           : Array.isArray(v) && v.every(x => typeof x === 'number') ? v.join(',')
             : typeof v === 'object' ? JSON.stringify(v) : String(v)
       }
